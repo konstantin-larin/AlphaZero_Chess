@@ -37,7 +37,7 @@ def run_pipeline(
     os.makedirs(save_path, exist_ok=True)
     os.makedirs(dataset_path, exist_ok=True)    
 
-    for iteration in range(ITERATIONS): # запускаем 10 итераций        
+    for iteration in range(iterations): # запускаем 10 итераций        
         # Runs MCTS
         net = ChessNet() # инициализируем сетку        
 
@@ -67,7 +67,7 @@ def run_pipeline(
         #     processes1.append(p1)
         # for p1 in processes1:
         #     p1.join()
-        MCTS_self_play(net, NUM_GAMES, SIMULATION_DEPTH, MAX_MOVES, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
+        MCTS_self_play(net, num_games, simulation_depth, max_moves, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
         # gather datasets
         game_states = {
             's': [],
@@ -90,7 +90,7 @@ def run_pipeline(
         current_net_filename = os.path.join(save_path,\
                                         f"current_net_trained8_iter{iteration}.pth.tar")        
         
-        train(net,game_states,EPOCHS,SEED, save_path=save_path)
+        train(net,game_states,epochs,seed, save_path=save_path)
         # save results
         torch.save({'state_dict': net.state_dict()}, current_net_filename)
 
