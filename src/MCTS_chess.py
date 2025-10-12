@@ -196,6 +196,7 @@ def save_as_pickle(completeName, data):
 
 
 def MCTS_self_play(chessnet,num_games, simulation_depth, dataset_path='./datasets/iter0'):
+    os.makedirs(dataset_path, exist_ok=True)
     for idxx in range(0,num_games):
         # запускаем игру
         current_board = c_board() #init доски 

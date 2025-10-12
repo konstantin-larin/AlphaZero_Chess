@@ -14,7 +14,11 @@ def run_pipeline(
         ITERATIONS=10, NUM_GAMES=50, SIMULATION_DEPTH=666, SEED=42, EPOCHS=200,
         save_path='./model_data/', dataset_path='./datasets/'
         ):
-    for iteration in range(ITERATIONS): # запускаем 10 итераций
+    
+    os.makedirs(save_path, exist_ok=True)
+    os.makedirs(dataset_path, exist_ok=True)    
+
+    for iteration in range(ITERATIONS): # запускаем 10 итераций        
         # Runs MCTS
         net = ChessNet() # инициализируем сетку        
 
@@ -44,7 +48,7 @@ def run_pipeline(
         #     processes1.append(p1)
         # for p1 in processes1:
         #     p1.join()
-        MCTS_self_play(net, NUM_GAMES, iteration, SIMULATION_DEPTH, dataset_path=dataset_path)
+        MCTS_self_play(net, NUM_GAMES, SIMULATION_DEPTH, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
         # gather datasets
         datasets = []        
         for j in range(iteration, -1, -1):
