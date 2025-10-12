@@ -11,7 +11,7 @@ import torch.multiprocessing as mp
 
 
 def run_pipeline(
-        ITERATIONS=10, NUM_GAMES=50, SIMULATION_DEPTH=666, SEED=42, EPOCHS=200,
+        ITERATIONS=10, NUM_GAMES=50, MAX_MOVES=100, SIMULATION_DEPTH=666, SEED=42, EPOCHS=200,         
         save_path='./model_data/', dataset_path='./datasets/'
         ):
     
@@ -48,7 +48,7 @@ def run_pipeline(
         #     processes1.append(p1)
         # for p1 in processes1:
         #     p1.join()
-        MCTS_self_play(net, NUM_GAMES, SIMULATION_DEPTH, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
+        MCTS_self_play(net, NUM_GAMES, SIMULATION_DEPTH, MAX_MOVES, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
         # gather datasets
         datasets = []        
         for j in range(iteration, -1, -1):

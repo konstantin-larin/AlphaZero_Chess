@@ -195,7 +195,7 @@ def save_as_pickle(completeName, data):
         pickle.dump(data, output)
 
 
-def MCTS_self_play(chessnet,num_games, simulation_depth, dataset_path='./datasets/iter0'):
+def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path='./datasets/iter0'):
     os.makedirs(dataset_path, exist_ok=True)
     for idxx in range(0,num_games):
         # запускаем игру
@@ -207,7 +207,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, dataset_path='./dataset
         # states = []
         states = Counter()
         value = 0
-        while checkmate == False and current_board.move_count <= 100:
+        while checkmate == False and current_board.move_count <= max_moves:
             # draw_counter = 0
             # for s in states:                                
             #     if np.array_equal(current_board.current_board,s):
