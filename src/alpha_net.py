@@ -105,8 +105,8 @@ class AlphaLoss(torch.nn.Module):
         total_error = (value_error.view(-1).float() + policy_error).mean()
         return total_error
     
-def train(net, dataset, epoch_start=0, epoch_stop=20, cpu=0):
-    torch.manual_seed(cpu)
+def train(net, dataset, epochs=20, seed=0):
+    torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
     criterion = AlphaLoss()
@@ -116,7 +116,7 @@ def train(net, dataset, epoch_start=0, epoch_stop=20, cpu=0):
     train_set = board_data(dataset)
     train_loader = DataLoader(train_set, batch_size=30, shuffle=True, num_workers=0, pin_memory=False)
     losses_per_epoch = []
-    for epoch in range(epoch_start, epoch_stop):
+    for epoch in range(epochs):
         scheduler.step()
         total_loss = 0.0
         losses_per_batch = []
@@ -144,7 +144,7 @@ def train(net, dataset, epoch_start=0, epoch_stop=20, cpu=0):
 
     fig = plt.figure()
     ax = fig.add_subplot(222)
-    ax.scatter([e for e in range(1,epoch_stop+1,1)], losses_per_epoch)
+    ax.scatter([e for e in range(1,epochs+1,1)], losses_per_epoch)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss per batch")
     ax.set_title("Loss vs Epoch")

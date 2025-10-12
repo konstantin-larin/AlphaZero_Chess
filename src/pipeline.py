@@ -11,11 +11,12 @@ import torch.multiprocessing as mp
 ITERATIONS = 10
 NUM_GAMES = 50
 SIMULATION_DEPTH = 666
+SEED = 42
+EPOCHS = 200
 if __name__=="__main__":
     for iteration in range(ITERATIONS): # запускаем 10 итераций
         # Runs MCTS
-        net = ChessNet() # инициализируем сетку
-        mp.set_start_method("spawn",force=True) # чистый процесс на Python        
+        net = ChessNet() # инициализируем сетку        
 
         #ставим на cuda
         cuda = torch.cuda.is_available() 
@@ -30,21 +31,20 @@ if __name__=="__main__":
             net.load_state_dict(checkpoint['state_dict'])
 
 
-
-        net.share_memory()# теперь все процессы будут работать с одними и теми же весами        
+        
         net.eval() #замораживаем веса сети переводим в инференес
         
         
         # играем этой моделью, собираем датасет 
-        processes1 = []
-        for i in range(5):
-            #добавил сюда iteration чтоб dataset сохранялся для каждой итерации
-            p1 = mp.Process(target=MCTS_self_play,args=(net,NUM_GAMES,i, iteration, SIMULATION_DEPTH)) 
-            p1.start()
-            processes1.append(p1)
-        for p1 in processes1:
-            p1.join()
-
+        # processes1 = []
+        # for i in range(5):
+        #     #добавил сюда iteration чтоб dataset сохранялся для каждой итерации
+        #     p1 = mp.Process(target=MCTS_self_play,args=(net,NUM_GAMES,i, iteration, SIMULATION_DEPTH)) 
+        #     p1.start()
+        #     processes1.append(p1)
+        # for p1 in processes1:
+        #     p1.join()
+        MCTS_self_play(net, NUM_GAMES, iteration, SIMULATION_DEPTH)
         # gather datasets
         datasets = []        
         for j in range(iteration, -1, -1):
@@ -62,12 +62,13 @@ if __name__=="__main__":
         current_net_filename = os.path.join("./model_data/",\
                                         f"current_net_trained8_iter{iteration}.pth.tar")        
         
-        processes2 = []
-        for i in range(5):
-            p2 = mp.Process(target=train,args=(net,datasets,0,200,i))
-            p2.start()
-            processes2.append(p2)
-        for p2 in processes2:
-            p2.join()
+        train(net,datasets,EPOCHS,SEED)
+        # processes2 = []
+        # for i in range(5):
+        #     p2 = mp.Process(target=train,args=(net,datasets,0,200,i))
+        #     p2.start()
+        #     processes2.append(p2)
+        # for p2 in processes2:
+        #     p2.join()
         # save results
         torch.save({'state_dict': net.state_dict()}, current_net_filename)

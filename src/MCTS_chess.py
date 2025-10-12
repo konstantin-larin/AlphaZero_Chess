@@ -197,7 +197,7 @@ def save_as_pickle(filename, data, cur_iter): #вставил сюда cur_iter
         pickle.dump(data, output)
 
 
-def MCTS_self_play(chessnet,num_games,cpu, cur_iter, simulation_depth):
+def MCTS_self_play(chessnet,num_games,cur_iter, simulation_depth):
     for idxx in range(0,num_games):
         # запускаем игру
         current_board = c_board() #init доски 
@@ -260,7 +260,8 @@ def MCTS_self_play(chessnet,num_games,cpu, cur_iter, simulation_depth):
         del dataset 
         
         save_as_pickle(
-            "dataset_cpu%i_%i_%s" % (cpu,idxx, datetime.datetime.today().strftime("%Y-%m-%d")),dataset_p, cur_iter)
+            "dataset_%i_%s" % (idxx, datetime.datetime.today().strftime("%Y-%m-%d")),
+            dataset_p, cur_iter)
 
 
 
