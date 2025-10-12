@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import pickle
 import os
-import collections
+from collections import Counter, defaultdict
+
 import numpy as np
 import math
 import encoder_decoder as ed
@@ -129,20 +130,24 @@ class UCTNode():
 class DummyNode(object):
     def __init__(self):
         self.parent = None
-        self.child_total_value = collections.defaultdict(float)
-        self.child_number_visits = collections.defaultdict(float)
+        self.child_total_value = defaultdict(float)
+        self.child_number_visits = defaultdict(float)
 
 
 def UCT_search(game_state, num_reads,net):
+    # Создаём корень дерева поиска с текущим состоянием доски game_state.
     root = UCTNode(game_state, move=None, parent=DummyNode())
     for i in range(num_reads):
         leaf = root.select_leaf()
         encoded_s = ed.encode_board(leaf.game); encoded_s = encoded_s.transpose(2,0,1)
-        encoded_s = torch.from_numpy(encoded_s).float().cuda()
+        device = next(net.parameters()).device
+        encoded_s = torch.from_numpy(encoded_s).float().to(device)
         child_priors, value_estimate = net(encoded_s)
-        child_priors = child_priors.detach().cpu().numpy().reshape(-1); value_estimate = value_estimate.item()
+        child_priors = child_priors.detach().cpu().numpy().reshape(-1)
+        value_estimate = value_estimate.item()
         if leaf.game.check_status() == True and leaf.game.in_check_possible_moves() == []: # if checkmate
-            leaf.backup(value_estimate); continue
+            leaf.backup(value_estimate) 
+            continue
         leaf.expand(child_priors) # need to make sure valid moves
         leaf.backup(value_estimate)
     return np.argmax(root.child_number_visits), root
@@ -168,53 +173,83 @@ def do_decode_n_move_pieces(board,move):
     return board
 
 def get_policy(root):
-    policy = np.zeros([4672], dtype=np.float32)
+    policy = np.zeros(4672, dtype=np.float32) #вектор распределения вероятностей для всех ходов
     for idx in np.where(root.child_number_visits!=0)[0]:
-        policy[idx] = root.child_number_visits[idx]/root.child_number_visits.sum()
+        this_move_used_count = root.child_number_visits[idx]
+        total_simulations = root.child_number_visits.sum()
+        policy[idx] = this_move_used_count / total_simulations
     return policy
 
-def save_as_pickle(filename, data):
-    completeName = os.path.join("./datasets/iter2/",\
+
+# def load_pickle(filename):
+#     completeName = os.path.join("./datasets/",\
+#                                 filename)
+#     with open(completeName, 'rb') as pkl_file:
+#         data = pickle.load(pkl_file)
+#     return data
+
+
+
+def save_as_pickle(filename, data, cur_iter): #вставил сюда cur_iter
+    completeName = os.path.join(f"./datasets/iter{cur_iter}/",\
                                 filename)
     with open(completeName, 'wb') as output:
         pickle.dump(data, output)
 
-def load_pickle(filename):
-    completeName = os.path.join("./datasets/",\
-                                filename)
-    with open(completeName, 'rb') as pkl_file:
-        data = pickle.load(pkl_file)
-    return data
 
-
-def MCTS_self_play(chessnet,num_games,cpu):
+def MCTS_self_play(chessnet,num_games,cpu, cur_iter, simulation_depth):
     for idxx in range(0,num_games):
-        current_board = c_board()
-        checkmate = False
+        # запускаем игру
+        current_board = c_board() #init доски 
+        checkmate = False 
+
+        
         dataset = [] # to get state, policy, value for neural network training
-        states = []
+        # states = []
+        states = Counter()
         value = 0
         while checkmate == False and current_board.move_count <= 100:
-            draw_counter = 0
-            for s in states:
-                if np.array_equal(current_board.current_board,s):
-                    draw_counter += 1
-            if draw_counter == 3: # draw by repetition
+            # draw_counter = 0
+            # for s in states:                                
+            #     if np.array_equal(current_board.current_board,s):
+            #         draw_counter += 1                    
+
+            # if draw_counter == 3:                
+            #     break
+
+            board_tuple = tuple(current_board.current_board.flatten())
+
+            states[board_tuple] += 1
+            if states[board_tuple] == 3:
+                # троекратное повторение ходов
                 break
-            states.append(copy.deepcopy(current_board.current_board))
-            board_state = copy.deepcopy(ed.encode_board(current_board))
-            best_move, root = UCT_search(current_board,777,chessnet)
-            current_board = do_decode_n_move_pieces(current_board,best_move) # decode move and move piece(s)
-            policy = get_policy(root)
-            dataset.append([board_state,policy])
-            print(current_board.current_board,current_board.move_count); print(" ")
+                            
+            
+            # states.append(copy.deepcopy(current_board.current_board))                        
+            # энкодим доску
+            board_state = copy.deepcopy(ed.encode_board(current_board))                    
+            best_move, root = UCT_search(current_board,simulation_depth,chessnet) 
+            # ходим и обновляем состояние доски
+            current_board = do_decode_n_move_pieces(current_board,best_move) 
+            # получаем вектор распределения вероятностей ходов 
+            policy = get_policy(root) 
+
+
+
+            dataset.append([board_state,policy])                        
+            print(current_board.current_board,current_board.move_count); 
+            print(" ")
+            
+
+            
             if current_board.check_status() == True and current_board.in_check_possible_moves() == []: # checkmate
                 if current_board.player == 0: # black wins
                     value = -1
                 elif current_board.player == 1: # white wins
                     value = 1
                 checkmate = True
-                
+        
+        
         dataset_p = []
         for idx,data in enumerate(dataset):
             s,p = data
@@ -222,33 +257,35 @@ def MCTS_self_play(chessnet,num_games,cpu):
                 dataset_p.append([s,p,0])
             else:
                 dataset_p.append([s,p,value])
-        del dataset
-        save_as_pickle("dataset_cpu%i_%i_%s" % (cpu,idxx, datetime.datetime.today().strftime("%Y-%m-%d")),dataset_p)
+        del dataset 
+        
+        save_as_pickle(
+            "dataset_cpu%i_%i_%s" % (cpu,idxx, datetime.datetime.today().strftime("%Y-%m-%d")),dataset_p, cur_iter)
 
 
+
+# if __name__=="__main__":
     
-if __name__=="__main__":
+#     net_to_play="current_net_trained8_iter1.pth.tar"
+#     mp.set_start_method("spawn",force=True)
+#     net = ChessNet()
+#     cuda = torch.cuda.is_available()
+#     if cuda:
+#         net.cuda()
+#     net.share_memory()
+#     net.eval()
+#     print("hi")
+#     #torch.save({'state_dict': net.state_dict()}, os.path.join("./model_data/",\
+#     #                                "current_net.pth.tar"))
     
-    net_to_play="current_net_trained8_iter1.pth.tar"
-    mp.set_start_method("spawn",force=True)
-    net = ChessNet()
-    cuda = torch.cuda.is_available()
-    if cuda:
-        net.cuda()
-    net.share_memory()
-    net.eval()
-    print("hi")
-    #torch.save({'state_dict': net.state_dict()}, os.path.join("./model_data/",\
-    #                                "current_net.pth.tar"))
-    
-    current_net_filename = os.path.join("./model_data/",\
-                                    net_to_play)
-    checkpoint = torch.load(current_net_filename)
-    net.load_state_dict(checkpoint['state_dict'])
-    processes = []
-    for i in range(6):
-        p = mp.Process(target=MCTS_self_play,args=(net,50,i))
-        p.start()
-        processes.append(p)
-    for p in processes:
-        p.join()
+#     current_net_filename = os.path.join("./model_data/",\
+#                                     net_to_play)
+#     checkpoint = torch.load(current_net_filename)
+#     net.load_state_dict(checkpoint['state_dict'])
+#     processes = []
+#     for i in range(5):
+#         p = mp.Process(target=MCTS_self_play,args=(net,50,i))
+#         p.start()
+#         processes.append(p)
+#     for p in processes:
+#         p.join()

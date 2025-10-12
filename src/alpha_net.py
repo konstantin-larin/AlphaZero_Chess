@@ -24,7 +24,7 @@ class board_data(Dataset):
 class ConvBlock(nn.Module):
     def __init__(self):
         super(ConvBlock, self).__init__()
-        self.action_size = 8*8*73
+        self.action_size = 8*8*73 #4672
         self.conv1 = nn.Conv2d(22, 256, 3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm2d(256)
 

@@ -34,7 +34,7 @@ if __name__=="__main__":
     net.load_state_dict(checkpoint['state_dict'])
     
     processes = []
-    for i in range(6):
+    for i in range(5):
         p = mp.Process(target=train,args=(net,datasets,0,200,i))
         p.start()
         processes.append(p)

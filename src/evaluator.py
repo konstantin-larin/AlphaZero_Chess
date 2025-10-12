@@ -98,7 +98,7 @@ if __name__=="__main__":
     current_chessnet.share_memory(); best_chessnet.share_memory()
     
     processes = []
-    for i in range(6):
+    for i in range(5):
         p = mp.Process(target=fork_process,args=(arena(current_chessnet,best_chessnet),50,i))
         p.start()
         processes.append(p)
