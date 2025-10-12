@@ -105,7 +105,7 @@ class AlphaLoss(torch.nn.Module):
         total_error = (value_error.view(-1).float() + policy_error).mean()
         return total_error
     
-def train(net, dataset, epochs=20, seed=0):
+def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
@@ -149,5 +149,5 @@ def train(net, dataset, epochs=20, seed=0):
     ax.set_ylabel("Loss per batch")
     ax.set_title("Loss vs Epoch")
     print('Finished Training')
-    plt.savefig(os.path.join("./model_data/", "Loss_vs_Epoch_%s.png" % datetime.datetime.today().strftime("%Y-%m-%d")))
+    plt.savefig(os.path.join(save_path, "Loss_vs_Epoch_%s.png" % datetime.datetime.today().strftime("%Y-%m-%d")))
 
