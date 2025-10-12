@@ -1,5 +1,6 @@
 # What is this fork about?
-Adding supervised learning, thereby creating a Supervised + RL hybrid model
+Adding supervised learning, thereby creating a Supervised + RL hybrid model.
+
 Maybe creating game styles based on elo rating or some grandmasters
 
 # AlphaZero_Chess
