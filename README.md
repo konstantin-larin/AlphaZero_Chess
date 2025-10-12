@@ -19,21 +19,19 @@ In this repository, you will find the following core scripts:
 - 19 residual blocks with each block consisting of two convolutional layers with batch normalization
 - An output block with two heads: a policy output head that consists of convolutional layer with batch normalization followed by logsoftmax, and a value head that consists of a convolutional layer with relu and tanh activation.
 
-3) chess_board.py – Implementation of a chess board python class with all game rules and possible moves
+3) chess_board.py ï¿½ Implementation of a chess board python class with all game rules and possible moves
 
-4) encoder_decoder.py – list of functions to encode/decode chess board class for input/interpretation into neural network, as well as encode/decode the action policy output from neural network
+4) encoder_decoder.py ï¿½ list of functions to encode/decode chess board class for input/interpretation into neural network, as well as encode/decode the action policy output from neural network
 
-5) evaluator.py – arena class to pit current neural net against the neural net from previous iteration, and keeps the neural net that wins the most games
+5) evaluator.py ï¿½ arena class to pit current neural net against the neural net from previous iteration, and keeps the neural net that wins the most games
 
-6) train.py – function to start the neural network training process
+6) train.py ï¿½ function to start the neural network training process
 
-7) train_multiprocessing.py – multiprocessing version of train.py
+7) train_multiprocessing.py ï¿½ multiprocessing version of train.py
 
-8) pipeline.py – script to starts a sequential iteration pipeline consisting of MCTS search to generate data and neural network training. The evaluator arena function is temporarily excluded here during the early stages of training the neural network.
+8) pipeline.py ï¿½ script to starts a sequential iteration pipeline consisting of MCTS search to generate data and neural network training. The evaluator arena function is temporarily excluded here during the early stages of training the neural network.
 
-9) visualize_board.py – miscellaneous function to visualize the chessboard in a more attractive way
-
-10) analyze_games.py – miscellaneous script to visualize and save the chess games
+9) analyze_games.py ï¿½ miscellaneous script to visualize and save the chess games
 
 # Iteration pipeline
 
