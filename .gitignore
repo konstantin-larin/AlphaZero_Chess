@@ -11,3 +11,4 @@
 /src/evaluator_data/*
 /gamesimages/*
 /venv/
+/src/__pycache__/*

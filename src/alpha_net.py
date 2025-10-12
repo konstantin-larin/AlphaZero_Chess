@@ -9,17 +9,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
 import datetime
+import numpy as np
 
 class board_data(Dataset):
-    def __init__(self, dataset): # dataset = np.array of (s, p, v)
-        self.X = dataset[:,0]
-        self.y_p, self.y_v = dataset[:,1], dataset[:,2]
+    def __init__(self, dataset): # dataset = np.array of (s, p, v)        
+        self.X = torch.from_numpy(np.array(dataset['s'], dtype=np.float32))          
+        self.y_p = torch.from_numpy(np.array(dataset['p'], dtype=np.float32))      
+        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8)        
     
-    def __len__(self):
+    def __len__(self):        
         return len(self.X)
     
-    def __getitem__(self,idx):
-        return self.X[idx].transpose(2,0,1), self.y_p[idx], self.y_v[idx]
+    def __getitem__(self,idx):        
+        return self.X[idx].permute(2,0,1), self.y_p[idx], self.y_v[idx]
 
 class ConvBlock(nn.Module):
     def __init__(self):
@@ -109,45 +111,57 @@ def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
+
     criterion = AlphaLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.003)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,200,300,400], gamma=0.2)
-    
+    optimizer = optim.Adam(net.parameters(), lr=3e-3)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=0.2)
+
     train_set = board_data(dataset)
-    train_loader = DataLoader(train_set, batch_size=30, shuffle=True, num_workers=0, pin_memory=False)
+    pin_memory = True if cuda else False
+    train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+
     losses_per_epoch = []
+
     for epoch in range(epochs):
-        scheduler.step()
-        total_loss = 0.0
-        losses_per_batch = []
-        for i,data in enumerate(train_loader,0):
-            state, policy, value = data
+        epoch_loss = 0.0
+        batches = 0
+        
+        for i, (state, policy, value) in enumerate(train_loader):            
             if cuda:
-                state, policy, value = state.cuda().float(), policy.float().cuda(), value.cuda().float()
+                state, policy, value = state.cuda(), policy.cuda(), value.cuda()
+
             optimizer.zero_grad()
-            policy_pred, value_pred = net(state) # policy_pred = torch.Size([batch, 4672]) value_pred = torch.Size([batch, 1])
-            loss = criterion(value_pred[:,0], value, policy_pred, policy)
+            policy_pred, value_pred = net(state)
+            loss = criterion(value_pred[:, 0], value, policy_pred, policy)
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()
-            if i % 10 == 9:    # print every 10 mini-batches of size = batch_size
-                print('Process ID: %d [Epoch: %d, %5d/ %d points] total loss per batch: %.3f' %
-                      (os.getpid(), epoch + 1, (i + 1)*30, len(train_set), total_loss/10))
-                print("Policy:",policy[0].argmax().item(),policy_pred[0].argmax().item())
-                print("Value:",value[0].item(),value_pred[0,0].item())
-                losses_per_batch.append(total_loss/10)
-                total_loss = 0.0
-        losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))
-        if len(losses_per_epoch) > 100:
-            if abs(sum(losses_per_epoch[-4:-1])/3-sum(losses_per_epoch[-16:-13])/3) <= 0.01:
-                break
 
-    fig = plt.figure()
-    ax = fig.add_subplot(222)
-    ax.scatter([e for e in range(1,epochs+1,1)], losses_per_epoch)
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss per batch")
-    ax.set_title("Loss vs Epoch")
-    print('Finished Training')
-    plt.savefig(os.path.join(save_path, "Loss_vs_Epoch_%s.png" % datetime.datetime.today().strftime("%Y-%m-%d")))
+            epoch_loss += loss.item()
+            batches += 1
+
+            if i % 10 == 0:
+                print(f"[Epoch {epoch+1}/{epochs}] Batch {i}: loss = {loss.item():.4f}")
+        
+        if batches > 0:
+            avg_loss = epoch_loss / batches
+            losses_per_epoch.append(avg_loss)
+            print(f"Epoch {epoch+1}: avg_loss = {avg_loss:.4f}")
+        else:
+            print("No batches in this epoch — skipping.")
+            continue
+
+        scheduler.step()
+        
+        if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
+            print("Early stopping: loss plateau.")
+            break
+
+
+    plt.figure()
+    plt.plot(range(1, len(losses_per_epoch)+1), losses_per_epoch)
+    plt.xlabel("Epoch")
+    plt.ylabel("Avg Loss")
+    plt.title("Training Loss per Epoch")
+    plt.savefig(os.path.join(save_path, f"Loss_vs_Epoch.png"))
+    print("Finished Training")
 

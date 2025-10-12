@@ -190,7 +190,7 @@ def get_policy(root):
 
 
 
-def save_as_pickle(completeName, data): 
+def save_as_pickle(completeName, data):     
     with open(completeName, 'wb') as output:
         pickle.dump(data, output)
 
@@ -198,6 +198,7 @@ def save_as_pickle(completeName, data):
 def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path='./datasets/iter0'):
     os.makedirs(dataset_path, exist_ok=True)
     for idxx in range(0,num_games):
+        print("Game:",idxx + 1, '\n')
         # запускаем игру
         current_board = c_board() #init доски 
         checkmate = False 
@@ -249,19 +250,22 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
                 checkmate = True
         
         
-        dataset_p = []
+        game_states = {'s': [], 'p': [], 'v': []}
         for idx,data in enumerate(dataset):
             s,p = data
-            if idx == 0:
-                dataset_p.append([s,p,0])
+            game_states['s'].append(s)
+            game_states['p'].append(p)
+            if idx == 0:                
+                game_states['v'].append(0)                
             else:
-                dataset_p.append([s,p,value])
+                game_states['v'].append(value)                       
+        
         del dataset 
         
         
         save_as_pickle(
             os.path.join(dataset_path, "dataset_%i_%s" % (idxx, datetime.datetime.today().strftime("%Y-%m-%d"))),
-            dataset_p,)
+            game_states,)
 
 
 
