@@ -15,11 +15,11 @@ import datetime
 
 
 class Arena():
-    def __init__(self,current_chessnet,best_chessnet, max_moves, simulaition_depth, dataset_path):
+    def __init__(self,current_chessnet,best_chessnet, max_moves, simulation_depth, dataset_path):
         self.current = current_chessnet
         self.best = best_chessnet
         self.max_moves = max_moves
-        self.simulation_depth = simulaition_depth
+        self.simulation_depth = simulation_depth
         self.dataset_path = dataset_path        
     
     def play_round(self):

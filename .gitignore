@@ -13,3 +13,4 @@
 /venv/
 src/__pycache__/
 /src/pretrain.csv
+/src/supervised_data/*

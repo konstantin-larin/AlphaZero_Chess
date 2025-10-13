@@ -125,7 +125,7 @@ def encode_action(board,initial_pos,final_pos,underpromote=None):
             if underpromote == "knight":
                 idx = 71
             if underpromote == "bishop":
-                idx = 72
+                idx = 72    
     encoded[i,j,idx] = 1
     encoded = encoded.reshape(-1); encoded = np.where(encoded==1)[0][0] #index of action
     return encoded

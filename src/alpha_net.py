@@ -110,6 +110,7 @@ class AlphaLoss(torch.nn.Module):
         total_error = (value_error.view(-1).float() + policy_error).mean()
         return total_error
     
+
 def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_data/'):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
@@ -156,12 +157,13 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
             print("No batches in this epoch — skipping.")
             continue
 
-
-
         if val_data is not None:
             with torch.no_grad():
                 val_loss = 0.0
+                correct_policy = 0
+                total_samples = 0
                 val_batches = 0
+
                 for state, policy, value in val_loader:
                     if cuda:
                         state, policy, value = state.cuda(), policy.cuda(), value.cuda()
@@ -169,18 +171,22 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
                     loss = criterion(value_pred[:, 0], value, policy_pred, policy)
                     val_loss += loss.item()
                     val_batches += 1
+
+                    # Policy accuracy
+                    pred_moves = policy_pred.argmax(dim=1)
+                    true_moves = policy.argmax(dim=1)
+                    correct_policy += (pred_moves == true_moves).sum().item()
+                    total_samples += state.size(0)
+
             val_loss /= val_batches
-            print(f"Validation loss: {val_loss:.4f}")
+            accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
+            print(f"Validation loss: {val_loss:.4f}, Moves accuracy: {accuracy:.4f}")
 
         scheduler.step()
         
         if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
             print("Early stopping: loss plateau.")
             break        
-        
-
-                    
-
 
     plt.figure()
     plt.plot(range(1, len(losses_per_epoch)+1), losses_per_epoch)
@@ -189,6 +195,45 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
     plt.title("Training Loss per Epoch")
     plt.savefig(os.path.join(save_path, f"Loss_vs_Epoch.png"))
     print("Finished Training")
+
+
+
+def test(net, test_data, seed=0):
+    torch.manual_seed(seed)
+    cuda = torch.cuda.is_available()
+    net.eval()
+
+    criterion = AlphaLoss()
+    pin_memory = True if cuda else False
+    test_set = board_data(test_data, seed=seed)
+    test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+
+    total_loss = 0.0
+    correct_policy = 0
+    total_samples = 0
+    batches = 0
+
+    with torch.no_grad():
+        for state, policy, value in test_loader:
+            if cuda:
+                state, policy, value = state.cuda(), policy.cuda(), value.cuda()
+            
+            policy_pred, value_pred = net(state)
+            loss = criterion(value_pred[:, 0], value, policy_pred, policy)
+            total_loss += loss.item()
+            batches += 1
+
+            # Accuracy для policy
+            pred_moves = policy_pred.argmax(dim=1)
+            true_moves = policy.argmax(dim=1)
+            correct_policy += (pred_moves == true_moves).sum().item()
+            total_samples += state.size(0)
+
+    avg_loss = total_loss / batches if batches > 0 else float("inf")
+    accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
+
+    print(f"Test loss: {avg_loss:.4f}, Moves accuracy: {accuracy:.4f}")
+    return avg_loss, accuracy
 
 
 
