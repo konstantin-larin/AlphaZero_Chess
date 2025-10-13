@@ -12,10 +12,13 @@ import datetime
 import numpy as np
 
 class board_data(Dataset):
-    def __init__(self, dataset): # dataset = np.array of (s, p, v)        
-        self.X = torch.from_numpy(np.array(dataset['s'], dtype=np.float32))          
-        self.y_p = torch.from_numpy(np.array(dataset['p'], dtype=np.float32))      
-        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8)        
+    def __init__(self, dataset, seed=None): # dataset = np.array of (s, p, v)                
+        if seed is not None:
+            np.random.seed(seed)
+        indices = np.random.permutation(len(dataset['s'])) # shuffle data
+        self.X = torch.from_numpy(np.array(dataset['s'], dtype=np.float32)[indices])               
+        self.y_p = torch.from_numpy(np.array(dataset['p'], dtype=np.float32)[indices])      
+        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8[indices])        
     
     def __len__(self):        
         return len(self.X)
@@ -107,7 +110,7 @@ class AlphaLoss(torch.nn.Module):
         total_error = (value_error.view(-1).float() + policy_error).mean()
         return total_error
     
-def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
+def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_data/'):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
@@ -116,9 +119,12 @@ def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
     optimizer = optim.Adam(net.parameters(), lr=3e-3)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=0.2)
 
-    train_set = board_data(dataset)
     pin_memory = True if cuda else False
+    train_set = board_data(train_data, seed=seed)    
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    if val_data is not None:
+        val_set = board_data(val_data, seed=seed)    
+        val_loader = DataLoader(val_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
 
     losses_per_epoch = []
 
@@ -150,11 +156,30 @@ def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
             print("No batches in this epoch — skipping.")
             continue
 
+
+
+        if val_data is not None:
+            with torch.no_grad():
+                val_loss = 0.0
+                val_batches = 0
+                for state, policy, value in val_loader:
+                    if cuda:
+                        state, policy, value = state.cuda(), policy.cuda(), value.cuda()
+                    policy_pred, value_pred = net(state)
+                    loss = criterion(value_pred[:, 0], value, policy_pred, policy)
+                    val_loss += loss.item()
+                    val_batches += 1
+            val_loss /= val_batches
+            print(f"Validation loss: {val_loss:.4f}")
+
         scheduler.step()
         
         if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
             print("Early stopping: loss plateau.")
-            break
+            break        
+        
+
+                    
 
 
     plt.figure()
@@ -165,3 +190,7 @@ def train(net, dataset, epochs=20, seed=0, save_path='./model_data/'):
     plt.savefig(os.path.join(save_path, f"Loss_vs_Epoch.png"))
     print("Finished Training")
 
+
+
+# def predict(net, board):
+        
