@@ -7,31 +7,36 @@ import pickle
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-# evaluator пока не применяется
+from evaluator import Arena
 
-ITERATIONS = 10
-NUM_GAMES = 50
-MAX_MOVES = 100
-SIMULATION_DEPTH = 666
-SEED = 42
-EPOCHS = 200
+# ITERATIONS = 10
+# NUM_GAMES = 50
+# MAX_MOVES = 100
+# EVAL_NUM_GAMES = 10
+# SIMULATION_DEPTH = 666
+# SEED = 42
+# EPOCHS = 200
 
 # for quick test
-# ITERATIONS = 2
-# NUM_GAMES = 2
-# MAX_MOVES = 3
-# SIMULATION_DEPTH = 10
-# SEED = 42
-# EPOCHS = 2
+ITERATIONS = 2
+NUM_GAMES = 2
+EVAL_NUM_GAMES = 2
+MAX_MOVES = 3
+SIMULATION_DEPTH = 10
+SEED = 42
+EPOCHS = 2
 
 def run_pipeline(
         iterations=ITERATIONS, 
         num_games=NUM_GAMES,
+        eval_num_games=EVAL_NUM_GAMES,
         max_moves=MAX_MOVES,
         simulation_depth=SIMULATION_DEPTH,
         seed=SEED,
         epochs=EPOCHS,
-        save_path='./model_data/', dataset_path='./datasets/'
+        save_path='./model_data/', 
+        dataset_path='./datasets/',
+        eval_path = './model_games/',
         ):
     
     os.makedirs(save_path, exist_ok=True)
@@ -58,15 +63,7 @@ def run_pipeline(
         net.eval() #замораживаем веса сети переводим в инференес
         
         
-        # играем этой моделью, собираем датасет 
-        # processes1 = []
-        # for i in range(5):
-        #     #добавил сюда iteration чтоб dataset сохранялся для каждой итерации
-        #     p1 = mp.Process(target=MCTS_self_play,args=(net,NUM_GAMES,i, iteration, SIMULATION_DEPTH)) 
-        #     p1.start()
-        #     processes1.append(p1)
-        # for p1 in processes1:
-        #     p1.join()
+        
         MCTS_self_play(net, num_games, simulation_depth, max_moves, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
         # gather datasets
         game_states = {
@@ -93,6 +90,31 @@ def run_pipeline(
         train(net,game_states,epochs,seed, save_path=save_path)
         # save results
         torch.save({'state_dict': net.state_dict()}, current_net_filename)
+        print(f"Saved current net to {current_net_filename}")
+        
+
+        best_net_filename = os.path.join(save_path,\
+                                        f"best_net_trained8.pth.tar")
+        if iteration > 0:            
+            print('evaluate current net vs best net')
+            best_net = ChessNet()
+
+            best_net_checkpoint = torch.load(best_net_filename)
+            best_net.load_state_dict(best_net_checkpoint['state_dict'])
+            if cuda:
+                best_net.cuda()
+            best_net.eval()
+            net.eval()
+
+            
+            arena = Arena(current_chessnet=net, best_chessnet=best_net, max_moves=max_moves, simulaition_depth=simulation_depth, dataset_path=eval_path)            
+            if best_net == arena.evaluate(num_games=eval_num_games):
+                print('best net is still best')
+            else:
+                torch.save({'state_dict': net.state_dict()}, best_net_filename)                                        
+        else:
+            print('save current net as best net')            
+            torch.save({'state_dict': net.state_dict()}, best_net_filename)
 
 
 
