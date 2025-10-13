@@ -4,7 +4,6 @@ import numpy as np
 from chess_board import board
 from MCTS_chess import save_as_pickle, do_decode_n_move_pieces
 import os
-from copy import deepcopy
 import encoder_decoder as ed
 from tqdm import tqdm
 import pickle
@@ -83,7 +82,7 @@ def create_game_states(data, full_path):
 
     for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing games"):
         board = FenBoard(row['fen'])
-        s = deepcopy(ed.encode_board(board))
+        s = ed.encode_board(board)
 
         # uci → action
         initial_pos, final_pos, underpromote = uci_to_indices(row['move'])
@@ -119,10 +118,18 @@ def preprocess_data(source_path, dest_path, seed):
     train, test = train_test_split(data, test_size=0.2, random_state=seed)    
     test, val = train_test_split(test, test_size=0.5, random_state=seed)                    
 
+    train_path = os.path.join(dest_path, 'train.pkl')
+    del train
+    val_path = os.path.join(dest_path, 'val.pkl')
+    del val
+    test_path = os.path.join(dest_path, 'test.pkl')
+    del test
+    create_game_states(train, train_path)              
+    create_game_states(val, val_path)
+    create_game_states(test, test_path)
+
     return (
-        create_game_states(train, os.path.join(dest_path, 'train')),        
-        create_game_states(val, os.path.join(dest_path, 'val')),
-        create_game_states(test, os.path.join(dest_path, 'test')),
+        train_path, val_path, test_path
     )    
 
     

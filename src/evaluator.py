@@ -107,7 +107,8 @@ class Arena():
                 current_wins += 1
             save_as_pickle(
             os.path.join(self.dataset_path, 
-                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d"))),
+                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")),
+                         '.pkl'),
             game_info,)
 
         current_wins_ratio = current_wins/num_games

@@ -264,7 +264,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
         
         
         save_as_pickle(
-            os.path.join(dataset_path, "dataset_%i_%s" % (idxx, datetime.datetime.today().strftime("%Y-%m-%d"))),
+            os.path.join(dataset_path, "dataset_%i_%s" % (idxx, datetime.datetime.today().strftime("%Y-%m-%d")), '.pkl'),
             game_states,)
 
 

@@ -54,13 +54,18 @@ def run_pipeline(
 
     best_net_filename = os.path.join(save_path,\
                                             f"best_net_trained8.pth.tar")        
-    train_data, val_data, test_data = preprocess_data(supervised_source_path, supervised_dest_path, seed)
+    train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)
+
+
 
 
     # supervised pretraining - делаем best_net изначальную 
     if sl:            
         net = ChessNet() 
+        
         net.train()
+        train_data = pickle.load(train_path, encoding='bytes')        
+        val_data = pickle.load(val_path, encoding='bytes')
         train(
             net=net,
             train_data=train_data,
@@ -69,6 +74,7 @@ def run_pipeline(
             seed=seed,
             save_path=save_path
         )
+        del train_data, val_data
 
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     else:
@@ -156,6 +162,8 @@ def run_pipeline(
 
             
     # test best_net        
+    test_data = pickle.load(test_path, encoding='bytes')
+    del test_data
     test(net=best_net, test_data=test_data, seed=seed)
         
                 
