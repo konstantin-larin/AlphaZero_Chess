@@ -119,15 +119,14 @@ def preprocess_data(source_path, dest_path, seed):
     test, val = train_test_split(test, test_size=0.5, random_state=seed)                    
 
     train_path = os.path.join(dest_path, 'train.pkl')
+    create_game_states(train, train_path)              
     del train
     val_path = os.path.join(dest_path, 'val.pkl')
+    create_game_states(val, val_path)
     del val
     test_path = os.path.join(dest_path, 'test.pkl')
-    del test
-    create_game_states(train, train_path)              
-    create_game_states(val, val_path)
     create_game_states(test, test_path)
-
+    del test    
     return (
         train_path, val_path, test_path
     )    
