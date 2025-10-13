@@ -20,9 +20,7 @@ class Arena():
         self.best = best_chessnet
         self.max_moves = max_moves
         self.simulation_depth = simulaition_depth
-        self.dataset_path = dataset_path
-
-        os.makedirs(dataset_path, exist_ok=True)
+        self.dataset_path = dataset_path        
     
     def play_round(self):
         if np.random.uniform(0,1) <= 0.5:
