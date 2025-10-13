@@ -106,7 +106,7 @@ def create_game_states(data, full_path):
 
     save_as_pickle(full_path, game_states)
     print(f"[INFO] Saved new file: {full_path}")
-    return game_states
+    del game_states
 
 
 
