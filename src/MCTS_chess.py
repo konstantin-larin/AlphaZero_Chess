@@ -12,6 +12,7 @@ import torch
 import torch.multiprocessing as mp
 from alpha_net import ChessNet
 import datetime
+import h5py
 
 class UCTNode():
     def __init__(self, game, move, parent=None):
@@ -181,22 +182,33 @@ def get_policy(root):
     return policy
 
 
-# def load_pickle(filename):
-#     completeName = os.path.join("./datasets/",\
-#                                 filename)
-#     with open(completeName, 'rb') as pkl_file:
-#         data = pickle.load(pkl_file)
-#     return data
 
 
 
-def save_as_pickle(completeName, data):     
-    with open(completeName, 'wb') as output:
-        pickle.dump(data, output)
+
+def append_selfplay_h5(h5_path, game_states):        
+    if not os.path.exists(h5_path):
+        # создаём новый файл с расширяемыми массивами
+        with h5py.File(h5_path, 'w') as f:
+            f.create_dataset('s', data=np.array(game_states['s'], dtype=np.float32),
+                             maxshape=(None,) + np.array(game_states['s']).shape[1:])
+            f.create_dataset('p', data=np.array(game_states['p'], dtype=np.float32),
+                             maxshape=(None, 4672))
+            f.create_dataset('v', data=np.array(game_states['v'], dtype=np.int8),
+                             maxshape=(None,))
+    else:
+        with h5py.File(h5_path, 'a') as f:
+            for key, dtype in zip(['s','p','v'], [np.float32, np.float32, np.int8]):
+                data = np.array(game_states[key], dtype=dtype)
+                dset = f[key]
+                old_len = dset.shape[0]
+                dset.resize(old_len + len(data), axis=0)
+                dset[old_len:] = data
 
 
-def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path='./datasets/iter0'):
-    os.makedirs(dataset_path, exist_ok=True)
+
+def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path):
+    
     for idxx in range(0,num_games):
         print("Game:",idxx + 1, '\n')
         # запускаем игру
@@ -250,6 +262,8 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
                 checkmate = True
         
         
+
+        
         game_states = {'s': [], 'p': [], 'v': []}
         for idx,data in enumerate(dataset):
             s,p = data
@@ -261,11 +275,11 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
                 game_states['v'].append(value)                       
         
         del dataset 
+
+        append_selfplay_h5(dataset_path, game_states)
         
         
-        save_as_pickle(
-            os.path.join(dataset_path, "dataset_%i_%s" % (idxx, datetime.datetime.today().strftime("%Y-%m-%d")), '.pkl'),
-            game_states,)
+        
 
 
 

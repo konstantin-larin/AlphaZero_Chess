@@ -14,3 +14,5 @@
 src/__pycache__/
 /src/pretrain.csv
 /src/supervised_data/*
+*.h5
+src/evaluation_data/*

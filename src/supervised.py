@@ -2,11 +2,12 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import numpy as np
 from chess_board import board
-from MCTS_chess import save_as_pickle, do_decode_n_move_pieces
+from MCTS_chess import do_decode_n_move_pieces
 import os
 import encoder_decoder as ed
 from tqdm import tqdm
 import pickle
+import h5py
 
 # меняем только init
 class FenBoard(board):        
@@ -72,66 +73,75 @@ def uci_to_indices(move):
 
 
 
+import os
+import h5py
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+
 def create_game_states(data, full_path):
     # если уже есть — просто загружаем
     if os.path.exists(full_path):
         print(f"[INFO] Loading existing file: {full_path}")
-        return pickle.load(full_path, encoding='bytes')                    
+        return full_path  # просто возвращаем путь, сам файл читаем через h5py
 
-    game_states = {'s': [], 'p': [], 'v': []}
+    # создаём HDF5 файл с пустыми массивами и maxshape=None для append
+    with h5py.File(full_path, 'w') as f:
+        max_s_shape = (None,) + ed.encode_board(FenBoard(data.iloc[0]['fen'])).shape
+        f.create_dataset('s', shape=(0,) + max_s_shape[1:], maxshape=(None,) + max_s_shape[1:], dtype=np.float32)
+        f.create_dataset('p', shape=(0, 4672), maxshape=(None, 4672), dtype=np.float32)
+        f.create_dataset('v', shape=(0,), maxshape=(None,), dtype=np.int8)
 
-    for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing games"):
-        board = FenBoard(row['fen'])
-        s = ed.encode_board(board)
+        for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing games"):
+            board = FenBoard(row['fen'])
+            s = ed.encode_board(board)
 
-        # uci → action
-        initial_pos, final_pos, underpromote = uci_to_indices(row['move'])
-        promo_map = {'q': 'queen', 'r': 'rook', 'b': 'bishop', 'n': 'knight'}
-        underpromote = promo_map.get(underpromote, underpromote)
+            # uci → action
+            initial_pos, final_pos, underpromote = uci_to_indices(row['move'])
+            promo_map = {'q': 'queen', 'r': 'rook', 'b': 'bishop', 'n': 'knight'}
+            underpromote = promo_map.get(underpromote, underpromote)
 
-        action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
-        p = np.zeros(4672, dtype=np.float32)
-        p[action_index] = 1.0
+            action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
+            p = np.zeros(4672, dtype=np.float32)
+            p[action_index] = 1.0
 
-        # применяем ход
-        board = do_decode_n_move_pieces(board, action_index)
+            # применяем ход
+            board = do_decode_n_move_pieces(board, action_index)
 
-        v = 0
-        if board.check_status() and board.in_check_possible_moves() == []:  # checkmate
-            v = 1 if board.player == 1 else -1
+            v = 0
+            if board.check_status() and board.in_check_possible_moves() == []:  # checkmate
+                v = 1 if board.player == 1 else -1
 
-        game_states['s'].append(s)
-        game_states['p'].append(p)
-        game_states['v'].append(v)
+            # append к HDF5 массивам
+            for key, value in zip(['s','p','v'], [s, p, v]):
+                dset = f[key]
+                dset.resize(dset.shape[0] + 1, axis=0)
+                dset[-1] = value
 
-    save_as_pickle(full_path, game_states)
-    print(f"[INFO] Saved new file: {full_path}")
-    del game_states
-
-
-
-
+    print(f"[INFO] Saved new HDF5 file: {full_path}")
+    return full_path
 
 
 def preprocess_data(source_path, dest_path, seed):
     data = pd.read_csv(source_path)
-    train, test = train_test_split(data, test_size=0.2, random_state=seed)    
-    test, val = train_test_split(test, test_size=0.5, random_state=seed)                    
+    train, test = train_test_split(data, test_size=0.2, random_state=seed, shuffle=True)
+    test, val = train_test_split(test, test_size=0.5, random_state=seed, shuffle=True)
 
-    train_path = os.path.join(dest_path, 'train.pkl')
-    create_game_states(train, train_path)              
+    train_path = os.path.join(dest_path, 'train.h5')
+    create_game_states(train, train_path)
     del train
-    val_path = os.path.join(dest_path, 'val.pkl')
+
+    val_path = os.path.join(dest_path, 'val.h5')
     create_game_states(val, val_path)
     del val
-    test_path = os.path.join(dest_path, 'test.pkl')
-    create_game_states(test, test_path)
-    del test    
-    return (
-        train_path, val_path, test_path
-    )    
 
-    
+    test_path = os.path.join(dest_path, 'test.h5')
+    create_game_states(test, test_path)
+    del test
+
+    return train_path, val_path, test_path
+
 
 if __name__ == "__main__":    
     preprocess_data()    

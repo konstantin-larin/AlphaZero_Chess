@@ -39,18 +39,18 @@ def run_pipeline(
         seed=SEED,
         epochs=EPOCHS,
         save_path=os.path.join(absoute_path, 'model_data'),
-        dataset_path=os.path.join(absoute_path, 'datasets'),
-        eval_path=os.path.join(absoute_path, 'model_games'),
+        selfplay_data_path=os.path.join(absoute_path, 'selfplay_data.h5'),
+        eval_path=os.path.join(absoute_path, 'evaluation_data'),
         supervised_source_path=os.path.join(absoute_path, 'pretrain.csv'),
         supervised_dest_path=os.path.join(absoute_path, 'supervised_data'), 
-        sl=True,       
-        rl=False,
+        sl=False,       
+        rl=True,        
         ):
     
     os.makedirs(supervised_dest_path, exist_ok=True)
     os.makedirs(eval_path, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
-    os.makedirs(dataset_path, exist_ok=True)    
+    
 
     best_net_filename = os.path.join(save_path,\
                                             f"best_net_trained8.pth.tar")        
@@ -63,18 +63,15 @@ def run_pipeline(
     if sl:            
         net = ChessNet() 
         
-        net.train()
-        train_data = pickle.load(train_path, encoding='bytes')        
-        val_data = pickle.load(val_path, encoding='bytes')
+        net.train()        
         train(
             net=net,
-            train_data=train_data,
-            val_data=val_data,
+            train_datapath=train_path,
+            val_datapath=val_path,
             epochs=epochs,
             seed=seed,
             save_path=save_path
-        )
-        del train_data, val_data
+        )        
 
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     else:
@@ -97,32 +94,13 @@ def run_pipeline(
             cuda = torch.cuda.is_available() 
             if cuda:
                 net.cuda()
-
-            # if iteration > 0:
-                # подгружаем веса с предыдущей итерации                                    
-                # current_net_filename = os.path.join(save_path,\
-                #                                 f"current_net_trained8_iter{iteration-1}.pth.tar")                        
-                # checkpoint = torch.load(current_net_filename)
+    
             checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
             net.load_state_dict(checkpoint['state_dict'])
                     
-            net.eval() #замораживаем веса сети переводим в инференес                        
-            MCTS_self_play(net, num_games, simulation_depth, max_moves, dataset_path=os.path.join(dataset_path, f"iter{iteration}"))
-            # gather datasets
-            game_states = {
-                's': [],
-                'p': [],
-                'v': []
-            }
-            for j in range(iteration, -1, -1):
-                data_path = os.path.join(dataset_path, f"iter{j}")
-                for idx, file in enumerate(os.listdir(data_path)):
-                    filename = os.path.join(data_path, file)
-                    with open(filename, 'rb') as fo:
-                        _game_states = pickle.load(fo, encoding='bytes')                    
-                        game_states['s'].extend(_game_states['s'])
-                        game_states['p'].extend(_game_states['p'])
-                        game_states['v'].extend(_game_states['v'])                    
+            net.eval()
+            MCTS_self_play(net, num_games, simulation_depth, max_moves, dataset_path=selfplay_data_path)
+            
             
 
 
@@ -134,8 +112,8 @@ def run_pipeline(
             # обучаем на играх с самой сабой
             train(
                 net=net,
-                train_data=game_states,
-                val_data=None,
+                train_datapath=selfplay_data_path,
+                val_datapath=None,                
                 epochs=epochs,
                 seed=seed,
                 save_path=save_path
@@ -161,10 +139,8 @@ def run_pipeline(
                 best_net = net
 
             
-    # test best_net        
-    test_data = pickle.load(test_path, encoding='bytes')
-    del test_data
-    test(net=best_net, test_data=test_data, seed=seed)
+    # test best_net                
+    test(net=best_net, test_datapath=test_path, seed=seed)
         
                 
 

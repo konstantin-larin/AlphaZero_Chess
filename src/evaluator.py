@@ -7,12 +7,15 @@ from alpha_net import ChessNet as cnet
 from chess_board import board as c_board
 import encoder_decoder as ed
 import copy
-from MCTS_chess import UCT_search, do_decode_n_move_pieces, get_policy, save_as_pickle
+from MCTS_chess import UCT_search, do_decode_n_move_pieces, get_policy
 import pickle
 import torch.multiprocessing as mp
 from collections import Counter
 import datetime
 
+def save_as_pickle(completeName, data):     
+    with open(completeName, 'wb') as output:
+        pickle.dump(data, output)
 
 class Arena():
     def __init__(self,current_chessnet,best_chessnet, max_moves, simulation_depth, dataset_path):
@@ -94,7 +97,7 @@ class Arena():
             winner, dataset = self.play_round(); 
 
             game_info = {
-                'winner': winner,                
+                'winner': winner,  
                 'num_moves': len(dataset['v']),
                 'dataset_name': "dataset_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")),
                 'game_states': dataset
@@ -107,8 +110,8 @@ class Arena():
                 current_wins += 1
             save_as_pickle(
             os.path.join(self.dataset_path, 
-                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")),
-                         '.pkl'),
+                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")) + '.pkl'
+                        ),
             game_info,)
 
         current_wins_ratio = current_wins/num_games

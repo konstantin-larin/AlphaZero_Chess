@@ -10,21 +10,26 @@ import matplotlib.pyplot as plt
 import os
 import datetime
 import numpy as np
+import h5py
+from tqdm import tqdm
+
 
 class board_data(Dataset):
-    def __init__(self, dataset, seed=None): # dataset = np.array of (s, p, v)                
-        if seed is not None:
-            np.random.seed(seed)
-        indices = np.random.permutation(len(dataset['s'])) # shuffle data
-        self.X = torch.from_numpy(np.array(dataset['s'], dtype=np.float32)[indices])               
-        self.y_p = torch.from_numpy(np.array(dataset['p'], dtype=np.float32)[indices])      
-        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8)[indices]
-    
-    def __len__(self):        
-        return len(self.X)
-    
-    def __getitem__(self,idx):        
-        return self.X[idx].permute(2,0,1), self.y_p[idx], self.y_v[idx]
+    def __init__(self, datapath):
+        self.f = h5py.File(datapath, 'r')
+        self.s = self.f['s']
+        self.p = self.f['p']
+        self.v = self.f['v']
+
+    def __len__(self):
+        return len(self.s)
+
+    def __getitem__(self, idx):
+        x = torch.from_numpy(self.s[idx]).permute(2,0,1).float()
+        y_p = torch.from_numpy(self.p[idx])
+        y_v = torch.tensor(self.v[idx], dtype=torch.int8)
+        return x, y_p, y_v
+
 
 class ConvBlock(nn.Module):
     def __init__(self):
@@ -111,7 +116,9 @@ class AlphaLoss(torch.nn.Module):
         return total_error
     
 
-def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_data/'):
+
+
+def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='./model_data/'):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
@@ -120,20 +127,23 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
     optimizer = optim.Adam(net.parameters(), lr=3e-3)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=0.2)
 
-    pin_memory = True if cuda else False
-    train_set = board_data(train_data, seed=seed)    
+    pin_memory = cuda
+    train_set = board_data(train_datapath)
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
-    if val_data is not None:
-        val_set = board_data(val_data, seed=seed)    
-        val_loader = DataLoader(val_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+
+    if val_datapath is not None:
+        val_set = board_data(val_datapath)
+        val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
 
     losses_per_epoch = []
 
     for epoch in range(epochs):
+        net.train()
         epoch_loss = 0.0
         batches = 0
-        
-        for i, (state, policy, value) in enumerate(train_loader):            
+
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False)
+        for state, policy, value in progress_bar:
             if cuda:
                 state, policy, value = state.cuda(), policy.cuda(), value.cuda()
 
@@ -145,26 +155,27 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
 
             epoch_loss += loss.item()
             batches += 1
+            progress_bar.set_postfix(loss=loss.item())
 
-            if i % 10 == 0:
-                print(f"[Epoch {epoch+1}/{epochs}] Batch {i}: loss = {loss.item():.4f}")
-        
         if batches > 0:
             avg_loss = epoch_loss / batches
             losses_per_epoch.append(avg_loss)
-            print(f"Epoch {epoch+1}: avg_loss = {avg_loss:.4f}")
+            tqdm.write(f"[Epoch {epoch+1}] Avg train loss = {avg_loss:.4f}")
         else:
-            print("No batches in this epoch — skipping.")
+            tqdm.write("No batches in this epoch — skipping.")
             continue
 
-        if val_data is not None:
+        # Validation
+        if val_datapath is not None:
+            net.eval()
             with torch.no_grad():
                 val_loss = 0.0
                 correct_policy = 0
                 total_samples = 0
                 val_batches = 0
 
-                for state, policy, value in val_loader:
+                val_bar = tqdm(val_loader, desc="Validating", leave=False)
+                for state, policy, value in val_bar:
                     if cuda:
                         state, policy, value = state.cuda(), policy.cuda(), value.cuda()
                     policy_pred, value_pred = net(state)
@@ -178,34 +189,36 @@ def train(net, train_data, val_data=None, epochs=20, seed=0, save_path='./model_
                     correct_policy += (pred_moves == true_moves).sum().item()
                     total_samples += state.size(0)
 
-            val_loss /= val_batches
-            accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
-            print(f"Validation loss: {val_loss:.4f}, Moves accuracy: {accuracy:.4f}")
+                val_loss /= max(val_batches, 1)
+                accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
+                tqdm.write(f"[Val] loss={val_loss:.4f}, policy_acc={accuracy:.4f}")
 
         scheduler.step()
-        
-        if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
-            print("Early stopping: loss plateau.")
-            break        
 
+        # Early stopping
+        if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
+            tqdm.write("Early stopping: loss plateau.")
+            break
+
+    # Plot losses
     plt.figure()
-    plt.plot(range(1, len(losses_per_epoch)+1), losses_per_epoch)
+    plt.plot(range(1, len(losses_per_epoch) + 1), losses_per_epoch)
     plt.xlabel("Epoch")
     plt.ylabel("Avg Loss")
     plt.title("Training Loss per Epoch")
-    plt.savefig(os.path.join(save_path, f"Loss_vs_Epoch.png"))
+    plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
     print("Finished Training")
 
 
 
-def test(net, test_data, seed=0):
+def test(net, test_datapath, seed):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.eval()
 
     criterion = AlphaLoss()
-    pin_memory = True if cuda else False
-    test_set = board_data(test_data, seed=seed)
+    pin_memory = cuda
+    test_set = board_data(test_datapath)
     test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
 
     total_loss = 0.0
@@ -214,26 +227,30 @@ def test(net, test_data, seed=0):
     batches = 0
 
     with torch.no_grad():
-        for state, policy, value in test_loader:
+        progress_bar = tqdm(test_loader, desc="Testing", leave=False)
+        for state, policy, value in progress_bar:
             if cuda:
                 state, policy, value = state.cuda(), policy.cuda(), value.cuda()
-            
+
             policy_pred, value_pred = net(state)
             loss = criterion(value_pred[:, 0], value, policy_pred, policy)
             total_loss += loss.item()
             batches += 1
 
-            # Accuracy для policy
+            # Policy accuracy
             pred_moves = policy_pred.argmax(dim=1)
             true_moves = policy.argmax(dim=1)
             correct_policy += (pred_moves == true_moves).sum().item()
             total_samples += state.size(0)
 
-    avg_loss = total_loss / batches if batches > 0 else float("inf")
-    accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
+            progress_bar.set_postfix(loss=loss.item())
 
-    print(f"Test loss: {avg_loss:.4f}, Moves accuracy: {accuracy:.4f}")
+    avg_loss = total_loss / max(batches, 1)
+    accuracy = correct_policy / max(total_samples, 1)
+
+    tqdm.write(f"[Test] loss = {avg_loss:.4f}, policy_acc = {accuracy:.4f}")
     return avg_loss, accuracy
+
 
 
 
