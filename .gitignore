@@ -8,7 +8,7 @@
 *.pth
 /src/datasets/*
 /src/model_data/*
-/src/evaluator_data/*
+/src/model_games/*
 /gamesimages/*
 /venv/
 src/__pycache__/
