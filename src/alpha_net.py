@@ -18,7 +18,7 @@ class board_data(Dataset):
         indices = np.random.permutation(len(dataset['s'])) # shuffle data
         self.X = torch.from_numpy(np.array(dataset['s'], dtype=np.float32)[indices])               
         self.y_p = torch.from_numpy(np.array(dataset['p'], dtype=np.float32)[indices])      
-        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8[indices])        
+        self.y_v = torch.tensor(dataset['v'], dtype=torch.int8)[indices]
     
     def __len__(self):        
         return len(self.X)
