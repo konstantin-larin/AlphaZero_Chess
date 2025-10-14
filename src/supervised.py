@@ -91,6 +91,7 @@ def create_game_states(data, full_path):
         for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing games"):
             board = FenBoard(row['fen'])
             s = ed.encode_board(board)
+            
 
             # uci → action
             initial_pos, final_pos, underpromote = uci_to_indices(row['move'])
@@ -98,8 +99,11 @@ def create_game_states(data, full_path):
             underpromote = promo_map.get(underpromote, underpromote)
 
             action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
-            p = np.full(4672, 0.1,dtype=np.float32)
-            p[action_index] = 0.9
+            possible_actions = board.actions()
+            p = np.full(4672, 0.5,dtype=np.float32)                        
+            p[action_index] = 1.0
+            p[possible_actions] = 0
+            
 
             # применяем ход
             board = do_decode_n_move_pieces(board, action_index)
