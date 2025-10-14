@@ -98,8 +98,8 @@ def create_game_states(data, full_path):
             underpromote = promo_map.get(underpromote, underpromote)
 
             action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
-            p = np.zeros(4672, dtype=np.float32)
-            p[action_index] = 1.0
+            p = np.full(4672, 0.1,dtype=np.float32)
+            p[action_index] = 0.9
 
             # применяем ход
             board = do_decode_n_move_pieces(board, action_index)
