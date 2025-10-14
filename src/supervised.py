@@ -100,9 +100,9 @@ def create_game_states(data, full_path):
 
             action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
             possible_actions = board.actions()
-            p = np.full(4672, 0.5,dtype=np.float32)                        
-            p[action_index] = 1.0
-            p[possible_actions] = 0
+            p = np.zeros(4672, dtype=np.float32)
+            p[possible_actions] = (1 - 0.8) / (len(possible_actions) - 1)
+            p[action_index] = 0.8                                                            
             
 
             # применяем ход
