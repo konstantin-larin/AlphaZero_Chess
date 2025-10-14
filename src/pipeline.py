@@ -43,18 +43,18 @@ def run_pipeline(
         eval_path=os.path.join(absoute_path, 'evaluation_data'),
         supervised_source_path=os.path.join(absoute_path, 'pretrain.csv'),
         supervised_dest_path=os.path.join(absoute_path, 'supervised_data'), 
-        sl=False,       
+        sl=True,       
         rl=True,        
         ):
     
+    print('starting pipeline')
     os.makedirs(supervised_dest_path, exist_ok=True)
     os.makedirs(eval_path, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
     
 
     best_net_filename = os.path.join(save_path,\
-                                            f"best_net_trained8.pth.tar")        
-    print('start')
+                                            f"best_net_trained8.pth.tar")           
     train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)
 
 
@@ -77,7 +77,7 @@ def run_pipeline(
 
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     else:
-        net = ChessNet('just_net') # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
+        net = ChessNet() # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     
     

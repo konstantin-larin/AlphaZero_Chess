@@ -17,6 +17,23 @@ def save_as_pickle(completeName, data):
     with open(completeName, 'wb') as output:
         pickle.dump(data, output)
 
+def indices_to_uci(i_pos, f_pos, prom=None):
+    def col_to_file(c): return chr(ord('a') + c)
+    def row_to_rank(r): return str(8 - r)
+
+    i, j = i_pos
+    x, y = f_pos
+
+    uci = f"{col_to_file(j)}{row_to_rank(i)}{col_to_file(y)}{row_to_rank(x)}"
+
+    if prom:
+        promo_map = {'queen': 'q', 'rook': 'r', 'bishop': 'b', 'knight': 'n'}
+        if prom in promo_map:
+            uci += promo_map[prom]
+
+    return uci
+
+
 class Arena():
     def __init__(self,current_chessnet,best_chessnet, max_moves, simulation_depth, dataset_path):
         self.current = current_chessnet
@@ -37,6 +54,7 @@ class Arena():
         states = Counter()        
         value = 0
         game_states = {'s': [], 'p': [], 'v': []}
+        uci_moves = [] # ходы добавляются по ходу партии
         while checkmate == False and current_board.move_count <= self.max_moves:
             # draw_counter = 0
             # for s in states:
@@ -59,8 +77,18 @@ class Arena():
                 best_move, root = UCT_search(current_board,self.simulation_depth,white)
             elif current_board.player == 1:
                 best_move, root = UCT_search(current_board,self.simulation_depth,black)
+            
+
+            # для просмотра игры в будущем записываем ходы в uci формате            
+            i_pos, f_pos, prom = ed.decode_action(current_board,best_move)            
+            promo_map = {'queen': 'q', 'rook': 'r', 'bishop': 'b', 'knight': 'n'}
+            for i, f, p in zip(i_pos,f_pos,prom):                                
+                p = promo_map.get(p, p)
+                uci_move = indices_to_uci(i, f, p)
+                uci_moves.append(uci_move)
 
             current_board = do_decode_n_move_pieces(current_board,best_move) # decode move and move piece(s)
+            
             policy = get_policy(root)
                    
             
@@ -84,23 +112,22 @@ class Arena():
 
         
         if value == -1:
-            return b, game_states
+            return b, game_states, uci_moves
         elif value == 1:
-            return w, game_states
+            return w, game_states, uci_moves
         else:
-            return None, game_states
+            return None, game_states, uci_moves
     
     def evaluate(self, num_games):        
         current_wins = 0
         for i in range(num_games):
-            print("Match:",i + 1, '\n')
-            winner, dataset = self.play_round(); 
-
+            print("Game:",i + 1, '\n')
+            winner, dataset, moves = self.play_round()
+            
             game_info = {
-                'winner': winner,  
-                'num_moves': len(dataset['v']),
-                'dataset_name': "dataset_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")),
-                'game_states': dataset
+                'title': f"Game: {str(i+1)}, {self.current.name} vs {self.best.name}",
+                'winner': self.current.name if winner == "current" else self.best.name,                                  
+                'moves': moves, 
             }
             if winner is None:
                 print('Draw!')
