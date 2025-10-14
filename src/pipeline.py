@@ -57,15 +57,16 @@ def run_pipeline(
     best_net_filename = os.path.join(save_path,\
                                             f"best_net_trained8.pth.tar")           
     train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)
-
-
+    cuda = torch.cuda.is_available() 
 
 
     # supervised pretraining - делаем best_net изначальную 
     if sl:                    
         net = ChessNet('base_supervised') # инициализируем сетку
-        print('supervised learning')
         
+        print('supervised learning')
+        if cuda:
+            net.cuda()
         net.train()        
         train(
             net=net,
@@ -94,8 +95,7 @@ def run_pipeline(
             # Runs MCTS
             net = ChessNet(f'chessnet_iteration_{iteration}') # инициализируем сетку        
 
-            #ставим на cuda
-            cuda = torch.cuda.is_available() 
+            #ставим на cuda            
             if cuda:
                 net.cuda()
     
