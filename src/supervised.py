@@ -73,12 +73,7 @@ def uci_to_indices(move):
 
 
 
-import os
-import h5py
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+
 
 def create_game_states(data, full_path):
     # если уже есть — просто загружаем
