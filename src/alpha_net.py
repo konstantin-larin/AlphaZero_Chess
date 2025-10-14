@@ -149,10 +149,7 @@ class AlphaLoss(torch.nn.Module):
         policy_error = torch.sum((-policy* 
                                 (1e-6 + y_policy.float()).float().log()), 1)
         total_error = (value_error.view(-1).float() + policy_error).mean()
-        return total_error
-    
-
-
+        return total_error    
 
 def train(net, 
           train_datapath, 
@@ -180,7 +177,6 @@ def train(net,
             "batch_size": batch_size,            
         })
 
-
     criterion = AlphaLoss()
     optimizer = optim.Adam(net.parameters(), lr=adam_lr)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=scheduler_gamma)
@@ -192,7 +188,6 @@ def train(net,
         train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
     else:
         train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)    
-    
 
     if val_datapath is not None:
         val_set = board_data(val_datapath)
@@ -201,13 +196,14 @@ def train(net,
             val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
         else:
             val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
-        
 
     losses_per_epoch = []
 
     for epoch in range(epochs):
         net.train()
         epoch_loss = 0.0
+        correct_policy = 0
+        total_samples = 0
         batches = 0
 
         progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False)
@@ -221,25 +217,32 @@ def train(net,
             loss.backward()
             optimizer.step()
 
+            # --- train metrics ---
             epoch_loss += loss.item()
             batches += 1
-            progress_bar.set_postfix(loss=loss.item())
+            pred_moves = policy_pred.argmax(dim=1)
+            true_moves = policy.argmax(dim=1)
+            correct_policy += (pred_moves == true_moves).sum().item()
+            total_samples += state.size(0)
+
+            progress_bar.set_postfix(loss=loss.item(), acc=correct_policy/total_samples if total_samples>0 else 0.0)
 
         if batches > 0:
             avg_loss = epoch_loss / batches
+            train_acc = correct_policy / total_samples if total_samples > 0 else 0.0
             losses_per_epoch.append(avg_loss)
-            tqdm.write(f"[Epoch {epoch+1}] Avg train loss = {avg_loss:.4f}")
+            tqdm.write(f"[Epoch {epoch+1}] Avg train loss = {avg_loss:.4f}, train policy acc = {train_acc:.4f}")
         else:
             tqdm.write("No batches in this epoch — skipping.")
             continue
 
-        # Validation
-        if val_datapath is not None:
+        
+        if val_datapath is not None:            
             net.eval()
             with torch.no_grad():
                 val_loss = 0.0
-                correct_policy = 0
-                total_samples = 0
+                correct_policy_val = 0
+                total_samples_val = 0
                 val_batches = 0
 
                 val_bar = tqdm(val_loader, desc="Validating", leave=False)
@@ -254,20 +257,21 @@ def train(net,
                     # Policy accuracy
                     pred_moves = policy_pred.argmax(dim=1)
                     true_moves = policy.argmax(dim=1)
-                    correct_policy += (pred_moves == true_moves).sum().item()
-                    total_samples += state.size(0)                    
+                    correct_policy_val += (pred_moves == true_moves).sum().item()
+                    total_samples_val += state.size(0)
 
                 val_loss /= max(val_batches, 1)
-                accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
-                tqdm.write(f"[Val] loss={val_loss:.4f}, policy_acc={accuracy:.4f}")
+                val_accuracy = correct_policy_val / total_samples_val if total_samples_val > 0 else 0.0
+                tqdm.write(f"[Val] loss={val_loss:.4f}, policy_acc={val_accuracy:.4f}")
 
         scheduler.step()
 
         if use_mlflow:
             mlflow.log_metrics({                
                 "train_loss": avg_loss,
+                "train_accuracy": train_acc,
                 "val_loss": val_loss if val_datapath else 0,
-                "val_accuracy": accuracy if val_datapath else 0,
+                "val_accuracy": val_accuracy if val_datapath else 0,
             }, step=epoch)
 
         # Early stopping
@@ -286,6 +290,7 @@ def train(net,
     else:
         plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
     print("Finished Training")
+
 
 
 
