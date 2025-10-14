@@ -44,7 +44,8 @@ def run_pipeline(
         supervised_source_path=os.path.join(absoute_path, 'pretrain.csv'),
         supervised_dest_path=os.path.join(absoute_path, 'supervised_data'), 
         sl=True,       
-        rl=True,        
+        rl=True, 
+        is_debug=True,       
         ):
     
     print('starting pipeline')
@@ -72,7 +73,8 @@ def run_pipeline(
             val_datapath=val_path,
             epochs=epochs,
             seed=seed,
-            save_path=save_path
+            save_path=save_path,
+            is_debug=is_debug
         )        
 
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
@@ -111,14 +113,15 @@ def run_pipeline(
             current_net_filename = os.path.join(save_path,\
                                             f"current_net_trained8_iter{iteration}.pth.tar")        
             
-            # обучаем на играх с самой сабой
+            # обучаем на играх с самой собой
             train(
                 net=net,
                 train_datapath=selfplay_data_path,
                 val_datapath=None,                
                 epochs=epochs,
                 seed=seed,
-                save_path=save_path
+                save_path=save_path,
+                is_debug=is_debug
             )            
             # save results
             torch.save({'state_dict': net.state_dict()}, current_net_filename)
@@ -141,8 +144,9 @@ def run_pipeline(
                 best_net = net
 
             
-    # test best_net                
-    test(net=best_net, test_datapath=test_path, seed=seed)
+    # test best_net      
+              
+    test(net=best_net, test_datapath=test_path, seed=seed, is_debug=is_debug)
         
                 
 

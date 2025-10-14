@@ -121,7 +121,7 @@ class AlphaLoss(torch.nn.Module):
 
 
 
-def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='./model_data/'):
+def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='./model_data/', is_debug=False):
     print("Starting Training")
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
@@ -133,15 +133,21 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
 
     pin_memory = cuda
     train_set = board_data(train_datapath)    
-    # train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)    
-    train_subset = Subset(train_set, range(min(64, len(train_set))))
-    train_loader = DataLoader(train_subset, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    if is_debug:
+        train_subset = Subset(train_set, range(min(64, len(train_set))))
+        train_loader = DataLoader(train_subset, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    else:
+        train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)    
+    
 
     if val_datapath is not None:
         val_set = board_data(val_datapath)
-        # val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
-        val_subset = Subset(val_set, range(min(64, len(val_set))))
-        val_loader = DataLoader(val_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        if is_debug:
+            val_subset = Subset(val_set, range(min(64, len(val_set))))
+            val_loader = DataLoader(val_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        else:
+            val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        
 
     losses_per_epoch = []
 
@@ -219,7 +225,7 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
 
 
 
-def test(net, test_datapath, seed):
+def test(net, test_datapath, seed, is_debug=False):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.eval()
@@ -227,9 +233,12 @@ def test(net, test_datapath, seed):
     criterion = AlphaLoss()
     pin_memory = cuda
     test_set = board_data(test_datapath)
-    # test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
-    test_subset = Subset(test_set, range(64))
-    test_loader = DataLoader(test_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    if is_debug:
+        test_subset = Subset(test_set, range(64))
+        test_loader = DataLoader(test_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    else:
+        test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    
 
     total_loss = 0.0
     correct_policy = 0
