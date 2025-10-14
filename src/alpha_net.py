@@ -12,6 +12,8 @@ import datetime
 import numpy as np
 import h5py
 from tqdm import tqdm
+from torch.utils.data import Subset
+
 
 
 class board_data(Dataset):
@@ -89,7 +91,7 @@ class OutBlock(nn.Module):
         return p, v
     
 class ChessNet(nn.Module):
-    def __init__(self, name):
+    def __init__(self, name='default_chessnet'):
         super(ChessNet, self).__init__()
         self.conv = ConvBlock()
         self.name = name
@@ -130,12 +132,16 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=0.2)
 
     pin_memory = cuda
-    train_set = board_data(train_datapath)
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    train_set = board_data(train_datapath)    
+    # train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    train_subset = Subset(train_set, range(64))
+    train_loader = DataLoader(train_subset, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
 
     if val_datapath is not None:
         val_set = board_data(val_datapath)
-        val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        # val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        val_subset = Subset(val_set, range(64))
+        val_loader = DataLoader(val_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
 
     losses_per_epoch = []
 
@@ -189,7 +195,7 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
                     pred_moves = policy_pred.argmax(dim=1)
                     true_moves = policy.argmax(dim=1)
                     correct_policy += (pred_moves == true_moves).sum().item()
-                    total_samples += state.size(0)
+                    total_samples += state.size(0)                    
 
                 val_loss /= max(val_batches, 1)
                 accuracy = correct_policy / total_samples if total_samples > 0 else 0.0
@@ -221,7 +227,9 @@ def test(net, test_datapath, seed):
     criterion = AlphaLoss()
     pin_memory = cuda
     test_set = board_data(test_datapath)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    # test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    test_subset = Subset(test_set, range(64))
+    test_loader = DataLoader(test_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
 
     total_loss = 0.0
     correct_policy = 0
