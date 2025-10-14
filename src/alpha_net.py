@@ -133,14 +133,14 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
 
     pin_memory = cuda
     train_set = board_data(train_datapath)    
-    # train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
-    train_subset = Subset(train_set, range(64))
+    # train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)    
+    train_subset = Subset(train_set, range(min(64, len(train_set))))
     train_loader = DataLoader(train_subset, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
 
     if val_datapath is not None:
         val_set = board_data(val_datapath)
         # val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
-        val_subset = Subset(val_set, range(64))
+        val_subset = Subset(val_set, range(min(64, len(val_set))))
         val_loader = DataLoader(val_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
 
     losses_per_epoch = []

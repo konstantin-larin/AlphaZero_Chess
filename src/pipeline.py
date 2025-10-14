@@ -27,7 +27,7 @@ MAX_MOVES = 3
 SIMULATION_DEPTH = 10
 SEED = 42
 EPOCHS = 2
-absoute_path = r'C:\Users\konst\Desktop\workflow\chess\AlphaZero_Chess\src'
+absoute_path = r'C:\Users\konst\Desktop\a'
 
 
 def run_pipeline(
@@ -57,12 +57,16 @@ def run_pipeline(
                                             f"best_net_trained8.pth.tar")           
     train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)
 
+    cuda = torch.cuda.is_available() 
+
 
 
 
     # supervised pretraining - делаем best_net изначальную 
     if sl:                    
         net = ChessNet('base_supervised') # инициализируем сетку
+        if cuda:
+            net.cuda()
         print('supervised learning')
         
         net.train()        
@@ -92,8 +96,7 @@ def run_pipeline(
             # Runs MCTS
             net = ChessNet(f'chessnet_iteration_{iteration}') # инициализируем сетку        
 
-            #ставим на cuda
-            cuda = torch.cuda.is_available() 
+            #ставим на cuda            
             if cuda:
                 net.cuda()
     
