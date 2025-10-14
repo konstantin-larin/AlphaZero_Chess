@@ -77,7 +77,7 @@ def uci_to_indices(move):
 
 def create_game_states(data, full_path):
     # если уже есть — просто загружаем
-    if os.path.exists(full_path):
+    if os.path.exists(full_path):    
         print(f"[INFO] Loading existing file: {full_path}")
         return full_path  # просто возвращаем путь, сам файл читаем через h5py
 
