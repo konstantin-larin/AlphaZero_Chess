@@ -14,8 +14,8 @@ from supervised import preprocess_data
 # ITERATIONS = 10
 # NUM_GAMES = 50
 # MAX_MOVES = 100
-# EVAL_NUM_GAMES = 10
-# SIMULATION_DEPTH = 666
+# EVAL_NUM_GAMES = 3
+# SIMULATION_DEPTH = 1000
 # SEED = 42
 # EPOCHS = 200
 
