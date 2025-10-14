@@ -98,11 +98,20 @@ def create_game_states(data, full_path):
             promo_map = {'q': 'queen', 'r': 'rook', 'b': 'bishop', 'n': 'knight'}
             underpromote = promo_map.get(underpromote, underpromote)
 
-            action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)
-            possible_actions = board.actions()
+            action_index = ed.encode_action(board, initial_pos, final_pos, underpromote=underpromote)                      
             p = np.zeros(4672, dtype=np.float32)
-            p[possible_actions] = (1 - 0.8) / (len(possible_actions) - 1)
-            p[action_index] = 0.8                                                            
+            
+            action_idxs = []
+            for action in board.actions()  : # possible actions                
+                if action != []:
+                    initial_pos,final_pos,underpromote = action
+                    action_idxs.append(ed.encode_action(board,initial_pos,final_pos,underpromote))            
+                
+            if len(action_idxs) > 1:
+                p[action_idxs] = (1 - 0.8) / (len(action_idxs) - 1)
+                p[action_index] = 0.8                                                            
+            else:
+                p[action_index] = 1.0
             
 
             # применяем ход

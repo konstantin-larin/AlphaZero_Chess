@@ -24,7 +24,7 @@ def get_or_create_experiment(experiment_name):
 
 
 def run_pipeline(    
-        use_mlflow=True,
+        use_mlflow=False,
         mlflow_params={
             "uri": "http://localhost:5000/",
             "experiment_name": 'AlphaZero',
@@ -76,8 +76,7 @@ def run_pipeline(
         supervised_dest_path=os.path.join(absoute_path, 'supervised_data'),                         
         ):
     
-    with open(log_path, "w") as f:
-        pass  # ничего не пишем, просто очищаем
+    
 
     # create experiment    
     if use_mlflow:
@@ -105,6 +104,14 @@ def run_pipeline(
     os.makedirs(supervised_dest_path, exist_ok=True)
     os.makedirs(eval_path, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
+
+
+    
+
+    if os.path.exists(log_path):
+        with open(log_path, "w") as f:
+            pass  # очищаем
+
     
 
     best_net_filename = os.path.join(save_path,\
