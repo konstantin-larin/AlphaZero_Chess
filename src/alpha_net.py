@@ -14,6 +14,10 @@ import h5py
 from tqdm import tqdm
 from torch.utils.data import Subset
 
+BOARD_X = 8
+BOARD_Y = 8
+BOARD_CHANNELS = 22
+LEGAL_MOVES = 73
 
 
 class board_data(Dataset):
@@ -29,30 +33,30 @@ class board_data(Dataset):
     def __getitem__(self, idx):
         x = torch.from_numpy(self.s[idx]).permute(2,0,1).float()
         y_p = torch.from_numpy(self.p[idx])
-        y_v = torch.tensor(self.v[idx], dtype=torch.int8)
+        y_v = torch.tensor(self.v[idx], dtype=torch.float32)
         return x, y_p, y_v
 
 
 class ConvBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, planes, kernel_size, stride, padding):
         super(ConvBlock, self).__init__()
-        self.action_size = 8*8*73 #4672
-        self.conv1 = nn.Conv2d(22, 256, 3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(256)
+        self.action_size = BOARD_X*BOARD_Y*LEGAL_MOVES 
+        self.conv1 = nn.Conv2d(BOARD_CHANNELS, planes, kernel_size, stride=stride, padding=padding)
+        self.bn1 = nn.BatchNorm2d(planes)
 
     def forward(self, s):
-        s = s.view(-1, 22, 8, 8)  # batch_size x channels x board_x x board_y
+        s = s.view(-1, BOARD_CHANNELS, BOARD_X, BOARD_Y)  # batch_size x channels x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))
         return s
 
 class ResBlock(nn.Module):
-    def __init__(self, inplanes=256, planes=256, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, kernel_size, stride, padding, downsample=None):
         super(ResBlock, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=kernel_size, stride=stride,
+                     padding=padding, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=kernel_size, stride=stride,
+                     padding=padding, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
 
     def forward(self, x):
@@ -66,42 +70,70 @@ class ResBlock(nn.Module):
         return out
     
 class OutBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, inplanes, value_hidden_dim, policy_hidden_dim):
         super(OutBlock, self).__init__()
-        self.conv = nn.Conv2d(256, 1, kernel_size=1) # value head
+        self.conv = nn.Conv2d(inplanes, 1, kernel_size=1) # value head
         self.bn = nn.BatchNorm2d(1)
-        self.fc1 = nn.Linear(8*8, 64)
-        self.fc2 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(BOARD_X*BOARD_Y, value_hidden_dim)
+        self.fc2 = nn.Linear(value_hidden_dim, 1)
         
-        self.conv1 = nn.Conv2d(256, 128, kernel_size=1) # policy head
-        self.bn1 = nn.BatchNorm2d(128)
+        self.conv1 = nn.Conv2d(inplanes, policy_hidden_dim, kernel_size=1) # policy head
+        self.bn1 = nn.BatchNorm2d(policy_hidden_dim)
         self.logsoftmax = nn.LogSoftmax(dim=1)
-        self.fc = nn.Linear(8*8*128, 8*8*73)
+        self.fc = nn.Linear(BOARD_X*BOARD_Y*policy_hidden_dim, BOARD_X*BOARD_Y*LEGAL_MOVES)
+        self.policy_hidden_dim = policy_hidden_dim
     
     def forward(self,s):
         v = F.relu(self.bn(self.conv(s))) # value head
-        v = v.view(-1, 8*8)  # batch_size X channel X height X width
+        v = v.view(-1, BOARD_X*BOARD_Y)  # batch_size X channel X height X width
         v = F.relu(self.fc1(v))
         v = F.tanh(self.fc2(v))
         
         p = F.relu(self.bn1(self.conv1(s))) # policy head
-        p = p.view(-1, 8*8*128)
+        p = p.view(-1, BOARD_X*BOARD_Y*self.policy_hidden_dim)
         p = self.fc(p)
         p = self.logsoftmax(p).exp()
         return p, v
     
 class ChessNet(nn.Module):
-    def __init__(self, name='default_chessnet'):
+    def __init__(self, 
+                 res_blocks_num=19,
+                 conv_planes=256, 
+                 conv_kernel_size=3,
+                 conv_stride=1,
+                 conv_padding=1,
+                 res_inplanes=256, 
+                 res_planes=256, 
+                 res_kernel_size=3, 
+                 res_stride=1, 
+                 res_padding=1,
+                 value_hidden_dim=64,
+                 policy_hidden_dim=128,
+                 
+
+                 name='default_chessnet'):
         super(ChessNet, self).__init__()
-        self.conv = ConvBlock()
+        self.conv = ConvBlock(planes=conv_planes, kernel_size=conv_kernel_size, stride=conv_stride, padding=conv_padding)
         self.name = name
-        for block in range(19):
-            setattr(self, "res_%i" % block,ResBlock())
-        self.outblock = OutBlock()
+        self.res_blocks_num = res_blocks_num
+        for block in range(res_blocks_num):
+            setattr(self, "res_%i" % block,
+                    ResBlock(
+                        inplanes=res_inplanes,
+                        planes=res_planes,
+                        kernel_size=res_kernel_size,
+                        stride=res_stride,
+                        padding=res_padding,                        
+                    ))
+        self.outblock = OutBlock(
+            inplanes=res_planes,
+            value_hidden_dim=value_hidden_dim,            
+            policy_hidden_dim=policy_hidden_dim
+        )
     
     def forward(self,s):
         s = self.conv(s)
-        for block in range(19):
+        for block in range(self.res_blocks_num):
             s = getattr(self, "res_%i" % block)(s)
         s = self.outblock(s)
         return s
@@ -121,32 +153,42 @@ class AlphaLoss(torch.nn.Module):
 
 
 
-def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='./model_data/', is_debug=False):
+def train(net, 
+          train_datapath, 
+          val_datapath=None, 
+          epochs=20, 
+          seed=0, 
+          save_path='./', 
+          is_debug=False,
+          adam_lr=3e-3,
+          scheduler_gamma=0.2,
+          batch_size=64,
+          ):
     print("Starting Training")
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
 
     criterion = AlphaLoss()
-    optimizer = optim.Adam(net.parameters(), lr=3e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=0.2)
+    optimizer = optim.Adam(net.parameters(), lr=adam_lr)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 200, 300, 400], gamma=scheduler_gamma)
 
     pin_memory = cuda
     train_set = board_data(train_datapath)    
     if is_debug:
-        train_subset = Subset(train_set, range(min(64, len(train_set))))
-        train_loader = DataLoader(train_subset, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)
+        train_subset = Subset(train_set, range(min(batch_size, len(train_set))))
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
     else:
-        train_loader = DataLoader(train_set, batch_size=64, shuffle=True, num_workers=0, pin_memory=pin_memory)    
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)    
     
 
     if val_datapath is not None:
         val_set = board_data(val_datapath)
         if is_debug:
             val_subset = Subset(val_set, range(min(64, len(val_set))))
-            val_loader = DataLoader(val_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+            val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
         else:
-            val_loader = DataLoader(val_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+            val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
         
 
     losses_per_epoch = []
@@ -225,7 +267,7 @@ def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='
 
 
 
-def test(net, test_datapath, seed, is_debug=False):
+def test(net, test_datapath, batch_size=64, seed=0, is_debug=False):
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.eval()
@@ -234,10 +276,10 @@ def test(net, test_datapath, seed, is_debug=False):
     pin_memory = cuda
     test_set = board_data(test_datapath)
     if is_debug:
-        test_subset = Subset(test_set, range(64))
-        test_loader = DataLoader(test_subset, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        test_subset = Subset(test_set, range(batch_size))
+        test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
     else:
-        test_loader = DataLoader(test_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=pin_memory)
+        test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
     
 
     total_loss = 0.0

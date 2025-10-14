@@ -18,3 +18,5 @@ opencv-python>=4.2
 
 streamlit>=1.45.1 
 python-chess>=1.11.2
+
+mlflow>=2.12.0

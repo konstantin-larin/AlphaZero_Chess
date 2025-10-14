@@ -194,11 +194,11 @@ def append_selfplay_h5(h5_path, game_states):
                              maxshape=(None,) + np.array(game_states['s']).shape[1:])
             f.create_dataset('p', data=np.array(game_states['p'], dtype=np.float32),
                              maxshape=(None, 4672))
-            f.create_dataset('v', data=np.array(game_states['v'], dtype=np.int8),
+            f.create_dataset('v', data=np.array(game_states['v'], dtype=np.float32),
                              maxshape=(None,))
     else:
         with h5py.File(h5_path, 'a') as f:
-            for key, dtype in zip(['s','p','v'], [np.float32, np.float32, np.int8]):
+            for key, dtype in zip(['s','p','v'], [np.float32, np.float32, np.float32]):
                 data = np.array(game_states[key], dtype=dtype)
                 dset = f[key]
                 old_len = dset.shape[0]

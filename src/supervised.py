@@ -86,7 +86,7 @@ def create_game_states(data, full_path):
         max_s_shape = (None,) + ed.encode_board(FenBoard(data.iloc[0]['fen'])).shape
         f.create_dataset('s', shape=(0,) + max_s_shape[1:], maxshape=(None,) + max_s_shape[1:], dtype=np.float32)
         f.create_dataset('p', shape=(0, 4672), maxshape=(None, 4672), dtype=np.float32)
-        f.create_dataset('v', shape=(0,), maxshape=(None,), dtype=np.int8)
+        f.create_dataset('v', shape=(0,), maxshape=(None,), dtype=np.float32)
 
         for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing games"):
             board = FenBoard(row['fen'])
