@@ -89,9 +89,10 @@ class OutBlock(nn.Module):
         return p, v
     
 class ChessNet(nn.Module):
-    def __init__(self):
+    def __init__(self, name):
         super(ChessNet, self).__init__()
         self.conv = ConvBlock()
+        self.name = name
         for block in range(19):
             setattr(self, "res_%i" % block,ResBlock())
         self.outblock = OutBlock()
@@ -119,6 +120,7 @@ class AlphaLoss(torch.nn.Module):
 
 
 def train(net, train_datapath, val_datapath=None, epochs=20, seed=0, save_path='./model_data/'):
+    print("Starting Training")
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()

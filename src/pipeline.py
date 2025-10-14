@@ -60,8 +60,9 @@ def run_pipeline(
 
 
     # supervised pretraining - делаем best_net изначальную 
-    if sl:            
-        net = ChessNet() 
+    if sl:                    
+        net = ChessNet('base_supervised') # инициализируем сетку
+        print('supervised learning')
         
         net.train()        
         train(
@@ -75,7 +76,7 @@ def run_pipeline(
 
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     else:
-        net = ChessNet() # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
+        net = ChessNet('just_net') # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
     
     
@@ -88,7 +89,7 @@ def run_pipeline(
     if rl:
         for iteration in range(iterations): 
             # Runs MCTS
-            net = ChessNet() # инициализируем сетку        
+            net = ChessNet(f'chessnet_iteration_{iteration}') # инициализируем сетку        
 
             #ставим на cuda
             cuda = torch.cuda.is_available() 
