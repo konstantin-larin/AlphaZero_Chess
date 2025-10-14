@@ -54,6 +54,7 @@ def run_pipeline(
 
     best_net_filename = os.path.join(save_path,\
                                             f"best_net_trained8.pth.tar")        
+    print('start')
     train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)
 
 
