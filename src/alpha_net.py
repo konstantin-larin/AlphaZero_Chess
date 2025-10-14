@@ -13,6 +13,7 @@ import numpy as np
 import h5py
 from tqdm import tqdm
 from torch.utils.data import Subset
+import mlflow
 
 BOARD_X = 8
 BOARD_Y = 8
@@ -156,18 +157,29 @@ class AlphaLoss(torch.nn.Module):
 def train(net, 
           train_datapath, 
           val_datapath=None, 
+          use_mlflow=True,
           epochs=20, 
           seed=0, 
           save_path='./', 
           is_debug=False,
           adam_lr=3e-3,
           scheduler_gamma=0.2,
-          batch_size=64,
+          batch_size=64,          
           ):
     print("Starting Training")
     torch.manual_seed(seed)
     cuda = torch.cuda.is_available()
     net.train()
+
+    if use_mlflow:                
+        mlflow.log_params({
+            'model_name': net.name,
+            "epochs": epochs,
+            "adam_lr": adam_lr,
+            "scheduler_gamma": scheduler_gamma,
+            "batch_size": batch_size,            
+        })
+
 
     criterion = AlphaLoss()
     optimizer = optim.Adam(net.parameters(), lr=adam_lr)
@@ -251,6 +263,13 @@ def train(net,
 
         scheduler.step()
 
+        if use_mlflow:
+            mlflow.log_metrics({                
+                "train_loss": avg_loss,
+                "val_loss": val_loss if val_datapath else 0,
+                "val_accuracy": accuracy if val_datapath else 0,
+            }, step=epoch)
+
         # Early stopping
         if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
             tqdm.write("Early stopping: loss plateau.")
@@ -262,7 +281,10 @@ def train(net,
     plt.xlabel("Epoch")
     plt.ylabel("Avg Loss")
     plt.title("Training Loss per Epoch")
-    plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
+    if use_mlflow:
+        mlflow.log_figure(plt.gcf(), f"Loss_vs_Epoch.png")        
+    else:
+        plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
     print("Finished Training")
 
 
@@ -309,7 +331,7 @@ def test(net, test_datapath, batch_size=64, seed=0, is_debug=False):
     avg_loss = total_loss / max(batches, 1)
     accuracy = correct_policy / max(total_samples, 1)
 
-    tqdm.write(f"[Test] loss = {avg_loss:.4f}, policy_acc = {accuracy:.4f}")
+    tqdm.write(f"[Test] loss = {avg_loss:.4f}, policy_acc = {accuracy:.4f}")    
     return avg_loss, accuracy
 
 

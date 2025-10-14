@@ -16,3 +16,5 @@ src/__pycache__/
 /src/supervised_data/*
 *.h5
 src/evaluation_data/*
+src/logs/
+src/logs.txt

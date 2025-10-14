@@ -12,6 +12,7 @@ import pickle
 import torch.multiprocessing as mp
 from collections import Counter
 import datetime
+import mlflow
 
 def save_as_pickle(completeName, data):     
     with open(completeName, 'wb') as output:
@@ -118,7 +119,7 @@ class Arena():
         else:
             return None, game_states, uci_moves
     
-    def evaluate(self, num_games):        
+    def evaluate(self, num_games, use_mlflow):        
         current_wins = 0
         for i in range(num_games):
             print("Game:",i + 1, '\n')
@@ -135,11 +136,13 @@ class Arena():
                 print("%s wins!" % winner)            
             if winner == "current":
                 current_wins += 1
-            save_as_pickle(
-            os.path.join(self.dataset_path, 
-                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")) + '.pkl'
-                        ),
-            game_info,)
+
+            filename= os.path.join(self.dataset_path, 
+                         "game_info_%i_%s" % (i, datetime.datetime.today().strftime("%Y-%m-%d")) + '.pkl')
+            
+            save_as_pickle(filename, game_info)
+            if use_mlflow:
+                mlflow.log_artifact(filename, artifact_path="evaluation_games")
 
         current_wins_ratio = current_wins/num_games
         print("Current_net wins ratio:", str(current_wins_ratio))

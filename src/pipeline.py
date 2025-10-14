@@ -3,7 +3,6 @@
 from alpha_net import ChessNet, train, test
 from MCTS_chess import MCTS_self_play 
 import os 
-import pickle 
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -11,6 +10,9 @@ from evaluator import Arena
 # добавляем supervised обучение
 from supervised import preprocess_data 
 import mlflow
+
+
+
 absoute_path = r'C:\Users\konst\Desktop\workflow\chess\AlphaZero_Chess\src'
 
 def get_or_create_experiment(experiment_name):    
@@ -19,10 +21,15 @@ def get_or_create_experiment(experiment_name):
     else:
         return mlflow.create_experiment(experiment_name)            
 
-def run_pipeline(    
-        mlflow_uri="http://localhost:5000/",
-        experiment_name='alpha_zero',
 
+
+def run_pipeline(    
+        use_mlflow=True,
+        mlflow_params={
+            "uri": "http://localhost:5000/",
+            "experiment_name": 'AlphaZero',
+            'run_name': "sl + rl",            
+        },
         model_params = {
             "res_blocks_num": 19,
             "conv_planes": 256, 
@@ -57,27 +64,43 @@ def run_pipeline(
 
         sl=True,
         rl=True,
-        is_debug=True,       
+        is_debug=True,               
         batch_size=64,  
         seed=42,
-        
-        save_path=os.path.join(absoute_path, 'model_data'),
+
+        log_path=os.path.join(absoute_path, 'logs.txt'),
+        save_path=os.path.join(absoute_path, 'model_data'),        
         selfplay_data_path=os.path.join(absoute_path, 'selfplay_data.h5'),
         eval_path=os.path.join(absoute_path, 'evaluation_data'),
         supervised_source_path=os.path.join(absoute_path, 'pretrain.csv'),
         supervised_dest_path=os.path.join(absoute_path, 'supervised_data'),                         
         ):
     
+    with open(log_path, "w") as f:
+        pass  # ничего не пишем, просто очищаем
 
-    # create experiment
+    # create experiment    
+    if use_mlflow:
+        mlflow.set_tracking_uri(mlflow_params['uri'])        
+        experiment_id = get_or_create_experiment(mlflow_params['experiment_name'])
+        mlflow.set_experiment(experiment_id=experiment_id)
+        mlflow.start_run(run_name=mlflow_params['run_name'])                    
+
+
+        if sl and rl:
+            mlflow.log_params({**model_params, **sl_params, **rl_params})                    
+
+        elif sl:
+            mlflow.log_params({**model_params, **sl_params})        
+        elif rl:
+            mlflow.log_params({**model_params, **rl_params})        
+
+    
+
+
     cuda = torch.cuda.is_available() 
-    torch.backends.cudnn.benchmark = True  
-    
-    # mlflow.set_tracking_uri(mlflow_uri)        
-    # experiment_id = get_or_create_experiment(experiment_name)
-    # mlflow.set_experiment(experiment_id=experiment_id)
-    
-
+    torch.backends.cudnn.benchmark = True      
+        
     print('starting pipeline')
     os.makedirs(supervised_dest_path, exist_ok=True)
     os.makedirs(eval_path, exist_ok=True)
@@ -96,10 +119,13 @@ def run_pipeline(
         print('supervised learning')
         if cuda:
             net.cuda()
-        net.train()        
+        net.train() 
+        if use_mlflow:
+            mlflow.start_run(run_name=f"Supervised_Learning", nested=True)     
         train(
             batch_size=batch_size,
             net=net,
+            use_mlflow=use_mlflow,
             train_datapath=train_path,            
             val_datapath=val_path,
             epochs=sl_params['train_epochs'],
@@ -107,10 +133,13 @@ def run_pipeline(
             scheduler_gamma=sl_params['scheduler_gamma'],                        
             seed=seed,
             save_path=save_path,
-            is_debug=is_debug
+            is_debug=is_debug,            
         )        
-
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
+        if use_mlflow:
+            mlflow.pytorch.log_model(net, name='model')
+            mlflow.end_run()                
+
     else:
         net = ChessNet(**model_params) # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
         torch.save({'state_dict': net.state_dict()}, best_net_filename)
@@ -122,8 +151,13 @@ def run_pipeline(
 
     
     # reinforce learning
-    if rl:
-        for iteration in range(rl_params['iterations']): 
+    if rl:       
+        if use_mlflow:
+            mlflow.start_run(run_name='Reinforcement Learning', nested=True) 
+
+        for iteration in range(rl_params['iterations']):                             
+            if use_mlflow:
+                mlflow.start_run(run_name=f'Iteration_{iteration}', nested=True)
             # Runs MCTS
             net = ChessNet(name=f'chessnet_iteration_{iteration}', **model_params) # инициализируем сетку        
 
@@ -136,7 +170,8 @@ def run_pipeline(
                     
             net.eval()
             MCTS_self_play(net, rl_params['num_games'], rl_params['simulation_depth'], 
-                           rl_params['max_moves'], dataset_path=selfplay_data_path)
+                           rl_params['max_moves'], dataset_path=selfplay_data_path, 
+                           log_path=log_path, use_mlflow=use_mlflow)
             
             
 
@@ -157,10 +192,13 @@ def run_pipeline(
                 scheduler_gamma=rl_params['scheduler_gamma'],                                
                 seed=seed,
                 save_path=save_path,
-                is_debug=is_debug
+                is_debug=is_debug,
+                use_mlflow=use_mlflow
             )            
             # save results
             torch.save({'state_dict': net.state_dict()}, current_net_filename)
+            if use_mlflow:
+                mlflow.pytorch.log_model(net, name='model')
             print(f"Saved current net to {current_net_filename}")
 
 
@@ -175,16 +213,26 @@ def run_pipeline(
                           max_moves=rl_params['max_moves'], 
                           simulation_depth=rl_params['simulation_depth'], dataset_path=eval_path)            
 
-            if best_net == arena.evaluate(num_games=rl_params['eval_num_games']):
+            if best_net == arena.evaluate(num_games=rl_params['eval_num_games'], use_mlflow=use_mlflow):
                 print('best net is still best')
             else:
                 torch.save({'state_dict': net.state_dict()},best_net_filename)            
                 best_net = net
+            if use_mlflow: 
+                mlflow.end_run()        
+        if use_mlflow:
+            mlflow.end_run()
 
             
     # test best_net      
-              
-    test(net=best_net, batch_size=batch_size, test_datapath=test_path, seed=seed, is_debug=is_debug)
+      
+    avg_loss, accuracy = test(net=best_net, batch_size=batch_size, test_datapath=test_path, seed=seed, is_debug=is_debug)        
+    if use_mlflow:
+        mlflow.log_metrics({
+            'test_loss': avg_loss,
+            'accuracy': accuracy,
+        })
+        mlflow.end_run()
         
                 
 

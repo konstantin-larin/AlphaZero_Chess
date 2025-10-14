@@ -13,6 +13,7 @@ import torch.multiprocessing as mp
 from alpha_net import ChessNet
 import datetime
 import h5py
+import mlflow
 
 class UCTNode():
     def __init__(self, game, move, parent=None):
@@ -207,10 +208,14 @@ def append_selfplay_h5(h5_path, game_states):
 
 
 
-def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path):
+def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path, log_path, use_mlflow):    
     
     for idxx in range(0,num_games):
         print("Game:",idxx + 1, '\n')
+        with open(log_path, "a") as f:
+                f.write(
+                    f"\nGame: {idxx}\n"
+                )
         # запускаем игру
         current_board = c_board() #init доски 
         checkmate = False 
@@ -248,9 +253,17 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
 
 
 
-            dataset.append([board_state,policy])                        
-            print(current_board.current_board,current_board.move_count); 
-            print(" ")
+            dataset.append([board_state,policy])                                    
+            # print(current_board.current_board,current_board.move_count)
+            # print(" ")
+            with open(log_path, "a") as f:
+                f.write(
+                    f"Board:\n{current_board.current_board}\nMove count: {current_board.move_count}\n\n"
+                )
+            
+
+            
+
             
 
             
@@ -263,7 +276,9 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
         
         
 
-        
+        if use_mlflow:
+            mlflow.log_artifact(log_path, artifact_path="logs")
+
         game_states = {'s': [], 'p': [], 'v': []}
         for idx,data in enumerate(dataset):
             s,p = data
