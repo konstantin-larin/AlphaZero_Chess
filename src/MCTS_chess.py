@@ -144,7 +144,8 @@ def UCT_search(game_state, num_reads,net):
         encoded_s = ed.encode_board(leaf.game); encoded_s = encoded_s.transpose(2,0,1)
         device = next(net.parameters()).device
         encoded_s = torch.from_numpy(encoded_s).float().to(device)
-        child_priors, value_estimate = net(encoded_s)
+        with torch.no_grad():
+            child_priors, value_estimate = net(encoded_s)
         child_priors = child_priors.detach().cpu().numpy().reshape(-1)
         value_estimate = value_estimate.item()
         if leaf.game.check_status() == True and leaf.game.in_check_possible_moves() == []: # if checkmate
