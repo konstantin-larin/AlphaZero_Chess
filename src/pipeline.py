@@ -165,6 +165,8 @@ def run_pipeline(
         for iteration in range(rl_params['iterations']):                             
             if use_mlflow:
                 mlflow.start_run(run_name=f'Iteration_{iteration}', nested=True)
+
+            print(f'ITERATION {iteration + 1}')
             # Runs MCTS
             net = ChessNet(name=f'chessnet_iteration_{iteration}', **model_params) # инициализируем сетку        
 
@@ -192,7 +194,7 @@ def run_pipeline(
             train(
                 net=net,
                 train_datapath=selfplay_data_path,
-                val_datapath=None,                
+                val_datapath=val_path,                
                 epochs=rl_params['train_epochs'],
                 batch_size=batch_size,
                 adam_lr=rl_params['adam_lr'],                                
