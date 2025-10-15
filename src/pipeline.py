@@ -12,7 +12,6 @@ from supervised import preprocess_data
 import mlflow
 
 
-
 absoute_path = r'C:\Users\konst\Desktop\workflow\chess\AlphaZero_Chess\src'
 
 def get_or_create_experiment(experiment_name):    
@@ -66,6 +65,7 @@ def run_pipeline(
         rl=True,
         is_debug=True,               
         batch_size=64,  
+        num_heads=5,
         seed=42,
 
         log_path=os.path.join(absoute_path, 'logs.txt'),
@@ -167,6 +167,8 @@ def run_pipeline(
                     mlflow.start_run(run_name=f'Iteration_{iteration}', nested=True)
 
                 print(f'ITERATION {iteration + 1}')
+                mp.set_start_method("spawn",force=True)
+
                 # Runs MCTS
                 net = ChessNet(name=f'chessnet_iteration_{iteration}', **model_params) # инициализируем сетку        
 
@@ -177,14 +179,22 @@ def run_pipeline(
                 checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
                 net.load_state_dict(checkpoint['state_dict'])
                         
-                net.eval()
-                MCTS_self_play(net, rl_params['num_games'], rl_params['simulation_depth'], 
-                            rl_params['max_moves'], dataset_path=selfplay_data_path, 
-                            log_path=log_path, use_mlflow=use_mlflow)
+                net.share_memory()
+                net.eval()    
+
+                processes = []                            
+
+                for i in range(num_heads):
+                    p = mp.Process(target=MCTS_self_play, args=(
+                        net, rl_params['num_games'], rl_params['simulation_depth'], 
+                        rl_params['max_moves'], selfplay_data_path, log_path, use_mlflow
+                    ))
+                    p.start()
+                    processes.append(p)
+                for p in processes:
+                    p.join()                
                 
                 
-
-
                 net.train()
                 print("learn mistakes")
                 current_net_filename = os.path.join(save_path,\
