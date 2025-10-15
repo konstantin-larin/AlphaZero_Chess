@@ -7,7 +7,7 @@ from alpha_net import ChessNet as cnet
 from chess_board import board as c_board
 import encoder_decoder as ed
 import copy
-from MCTS_chess import UCT_search, do_decode_n_move_pieces, get_policy
+from MCTS_chess import do_decode_n_move_pieces, get_policy, UCT_search_batched
 import pickle
 import torch.multiprocessing as mp
 from collections import Counter
@@ -75,9 +75,9 @@ class Arena():
             board_state = copy.deepcopy(ed.encode_board(current_board))
             
             if current_board.player == 0:
-                best_move, root = UCT_search(current_board,self.simulation_depth,white)
+                best_move, root = UCT_search_batched(current_board, self.simulation_depth, white, 32)
             elif current_board.player == 1:
-                best_move, root = UCT_search(current_board,self.simulation_depth,black)
+                best_move, root = UCT_search_batched(current_board, self.simulation_depth, black, 32)
             
 
             # для просмотра игры в будущем записываем ходы в uci формате            
