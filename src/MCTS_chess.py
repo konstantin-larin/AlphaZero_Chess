@@ -195,7 +195,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, log_path, us
     
     for idxx in range(0,num_games):
         print(f"Proc_{proc} - Game:",idxx + 1, '\n', flush=True)
-        with open(log_path + f'/log_{proc}.txt', "a") as f:
+        with open(os.path.join(log_path, f'log_{proc}.txt'), "a") as f:
                 f.write(
                     f"\nGame: {idxx}\n"
                 )
@@ -239,7 +239,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, log_path, us
             dataset.append([board_state,policy])                                    
             # print(current_board.current_board,current_board.move_count)
             # print(" ")
-            with open(log_path + f'/log_{proc}.txt', "a") as f:
+            with open(os.path.join(log_path, f'log_{proc}.txt'), "a") as f:
                 f.write(
                     f"Board:\n{current_board.current_board}\nMove count: {current_board.move_count}\n\n"
                 )
@@ -260,7 +260,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, log_path, us
         
 
         if use_mlflow:
-            mlflow.log_artifact(log_path + f'/log_{proc}.txt', artifact_path="logs")
+            mlflow.log_artifact(os.path.join(log_path, f'log_{proc}.txt'), artifact_path="logs")
 
         game_states = {'s': [], 'p': [], 'v': []}
         for idx,data in enumerate(dataset):
