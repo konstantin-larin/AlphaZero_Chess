@@ -187,32 +187,15 @@ def get_policy(root):
 
 
 
-def append_selfplay_h5(h5_path, game_states):        
-    if not os.path.exists(h5_path):
-        # создаём новый файл с расширяемыми массивами
-        with h5py.File(h5_path, 'w') as f:
-            f.create_dataset('s', data=np.array(game_states['s'], dtype=np.float32),
-                             maxshape=(None,) + np.array(game_states['s']).shape[1:])
-            f.create_dataset('p', data=np.array(game_states['p'], dtype=np.float32),
-                             maxshape=(None, 4672))
-            f.create_dataset('v', data=np.array(game_states['v'], dtype=np.float32),
-                             maxshape=(None,))
-    else:
-        with h5py.File(h5_path, 'a') as f:
-            for key, dtype in zip(['s','p','v'], [np.float32, np.float32, np.float32]):
-                data = np.array(game_states[key], dtype=dtype)
-                dset = f[key]
-                old_len = dset.shape[0]
-                dset.resize(old_len + len(data), axis=0)
-                dset[old_len:] = data
 
 
 
-def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path, log_path, use_mlflow, proc=1):    
+
+def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, log_path, use_mlflow, proc=1, queue=None):    
     
     for idxx in range(0,num_games):
         print(f"Proc_{proc} - Game:",idxx + 1, '\n', flush=True)
-        with open(log_path + f'log_{proc}.txt', "a") as f:
+        with open(log_path + f'/log_{proc}.txt', "a") as f:
                 f.write(
                     f"\nGame: {idxx}\n"
                 )
@@ -256,7 +239,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
             dataset.append([board_state,policy])                                    
             # print(current_board.current_board,current_board.move_count)
             # print(" ")
-            with open(log_path + f'log_{proc}.txt', "a") as f:
+            with open(log_path + f'/log_{proc}.txt', "a") as f:
                 f.write(
                     f"Board:\n{current_board.current_board}\nMove count: {current_board.move_count}\n\n"
                 )
@@ -277,7 +260,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
         
 
         if use_mlflow:
-            mlflow.log_artifact(log_path, artifact_path="logs")
+            mlflow.log_artifact(log_path + f'/log_{proc}.txt', artifact_path="logs")
 
         game_states = {'s': [], 'p': [], 'v': []}
         for idx,data in enumerate(dataset):
@@ -291,7 +274,10 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
         
         del dataset 
 
-        append_selfplay_h5(dataset_path, game_states)
+        if queue is not None:
+            queue.put(game_states)
+            
+        return game_states
         
         
         

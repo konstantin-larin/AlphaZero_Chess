@@ -10,6 +10,7 @@ from evaluator import Arena
 # добавляем supervised обучение
 from supervised import preprocess_data 
 import mlflow
+import h5py
 
 
 absoute_path = r'C:\Users\konst\Desktop\workflow\chess\AlphaZero_Chess\src'
@@ -20,7 +21,24 @@ def get_or_create_experiment(experiment_name):
     else:
         return mlflow.create_experiment(experiment_name)            
 
-
+def append_selfplay_h5(h5_path, game_states):        
+    if not os.path.exists(h5_path):
+        # создаём новый файл с расширяемыми массивами
+        with h5py.File(h5_path, 'w') as f:
+            f.create_dataset('s', data=np.array(game_states['s'], dtype=np.float32),
+                             maxshape=(None,) + np.array(game_states['s']).shape[1:])
+            f.create_dataset('p', data=np.array(game_states['p'], dtype=np.float32),
+                             maxshape=(None, 4672))
+            f.create_dataset('v', data=np.array(game_states['v'], dtype=np.float32),
+                             maxshape=(None,))
+    else:
+        with h5py.File(h5_path, 'a') as f:
+            for key, dtype in zip(['s','p','v'], [np.float32, np.float32, np.float32]):
+                data = np.array(game_states[key], dtype=dtype)
+                dset = f[key]
+                old_len = dset.shape[0]
+                dset.resize(old_len + len(data), axis=0)
+                dset[old_len:] = data
 
 def run_pipeline(    
         use_mlflow=False,
@@ -55,10 +73,10 @@ def run_pipeline(
             "adam_lr": 3e-3,
             "scheduler_gamma": 0.2,
             "iterations": 2, 
-            "num_games": 3,
-            "eval_num_games": 3,
-            "max_moves": 5,
-            "simulation_depth": 10,
+            "num_games": 2,
+            "eval_num_games": 2,
+            "max_moves": 2,
+            "simulation_depth": 1,
         },
 
         sl=True,
@@ -176,19 +194,33 @@ def run_pipeline(
                 net.share_memory()
                 net.eval()    
 
+                queue = mp.Queue()
                 processes = []                            
 
                 for i in range(1, num_heads + 1):
                     p = mp.Process(target=MCTS_self_play, args=(
                         net, rl_params['num_games'], rl_params['simulation_depth'], 
-                        rl_params['max_moves'], selfplay_data_path, log_path, use_mlflow,i
+                        rl_params['max_moves'], log_path, use_mlflow,i, queue
                     ))
                     p.start()
                     processes.append(p)
-                for p in processes:
+               
+                all_games_states = {
+                    's': [],
+                    'p': [],
+                    'v': [],
+                }
+                for _ in range(num_heads):
+                    game_state = queue.get()
+                    all_games_states['s'].extend(game_state['s'])
+                    all_games_states['p'].extend(game_state['p'])
+                    all_games_states['v'].extend(game_state['v'])
+
+                append_selfplay_h5(selfplay_data_path, all_games_states)
+
+
+                for p in processes:                    
                     p.join()                
-                
-                
                 net.train()
                 print("learn mistakes")
                 current_net_filename = os.path.join(save_path,\
@@ -247,7 +279,7 @@ def run_pipeline(
             })
             mlflow.end_run()        
     except KeyboardInterrupt:
-        print("\KeyboardInterrupt detected. Stopping gracefully...")
+        print("KeyboardInterrupt detected. Stopping gracefully...")
     finally:
         # Закрываем все открытые run'ы
         if use_mlflow:
