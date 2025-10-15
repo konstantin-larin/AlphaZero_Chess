@@ -68,7 +68,7 @@ def run_pipeline(
         num_heads=5,
         seed=42,
 
-        log_path=os.path.join(absoute_path, 'logs.txt'),
+        log_path=os.path.join(absoute_path, 'logs'),
         save_path=os.path.join(absoute_path, 'model_data'),        
         selfplay_data_path=os.path.join(absoute_path, 'selfplay_data.h5'),
         eval_path=os.path.join(absoute_path, 'evaluation_data'),
@@ -104,13 +104,7 @@ def run_pipeline(
         os.makedirs(supervised_dest_path, exist_ok=True)
         os.makedirs(eval_path, exist_ok=True)
         os.makedirs(save_path, exist_ok=True)
-
-
-        
-
-        if os.path.exists(log_path):
-            with open(log_path, "w") as f:
-                pass  # очищаем
+        os.makedirs(log_path, exist_ok=True)
 
         
 
@@ -184,10 +178,10 @@ def run_pipeline(
 
                 processes = []                            
 
-                for i in range(num_heads):
+                for i in range(1, num_heads + 1):
                     p = mp.Process(target=MCTS_self_play, args=(
                         net, rl_params['num_games'], rl_params['simulation_depth'], 
-                        rl_params['max_moves'], selfplay_data_path, log_path, use_mlflow
+                        rl_params['max_moves'], selfplay_data_path, log_path, use_mlflow,i
                     ))
                     p.start()
                     processes.append(p)

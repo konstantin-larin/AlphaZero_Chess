@@ -208,11 +208,11 @@ def append_selfplay_h5(h5_path, game_states):
 
 
 
-def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path, log_path, use_mlflow):    
+def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path, log_path, use_mlflow, proc=1):    
     
     for idxx in range(0,num_games):
-        print("Game:",idxx + 1, '\n')
-        with open(log_path, "a") as f:
+        print(f"Proc_{proc} - Game:",idxx + 1, '\n', flush=True)
+        with open(log_path + f'log_{proc}.txt', "a") as f:
                 f.write(
                     f"\nGame: {idxx}\n"
                 )
@@ -256,7 +256,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
             dataset.append([board_state,policy])                                    
             # print(current_board.current_board,current_board.move_count)
             # print(" ")
-            with open(log_path, "a") as f:
+            with open(log_path + f'log_{proc}.txt', "a") as f:
                 f.write(
                     f"Board:\n{current_board.current_board}\nMove count: {current_board.move_count}\n\n"
                 )
