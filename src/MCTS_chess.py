@@ -136,89 +136,23 @@ class DummyNode(object):
         self.child_number_visits = defaultdict(float)
 
 
-# def UCT_search(game_state, num_reads,net):
-#     # Создаём корень дерева поиска с текущим состоянием доски game_state.
-#     root = UCTNode(game_state, move=None, parent=DummyNode())
-#     for i in range(num_reads):
-#         leaf = root.select_leaf()
-#         encoded_s = ed.encode_board(leaf.game); encoded_s = encoded_s.transpose(2,0,1)
-#         device = next(net.parameters()).device
-#         encoded_s = torch.from_numpy(encoded_s).float().to(device)
-#         child_priors, value_estimate = net(encoded_s)
-#         child_priors = child_priors.detach().cpu().numpy().reshape(-1)
-#         value_estimate = value_estimate.item()
-#         if leaf.game.check_status() == True and leaf.game.in_check_possible_moves() == []: # if checkmate
-#             leaf.backup(value_estimate) 
-#             continue
-#         leaf.expand(child_priors) # need to make sure valid moves
-#         leaf.backup(value_estimate)
-#     return np.argmax(root.child_number_visits), root
-
-
-def UCT_search_batched(game_state, num_reads, net, batch_size=32):
-    # root and device
+def UCT_search(game_state, num_reads,net):
+    # Создаём корень дерева поиска с текущим состоянием доски game_state.
     root = UCTNode(game_state, move=None, parent=DummyNode())
-    device = next(net.parameters()).device
-    net.eval()
-
-    leaves_to_eval = []   # list of UCTNode
-    leaves_idx = []       # indices order to apply results after forward
-
-    def flush_batch():
-        if not leaves_to_eval:
-            return
-        # build batch tensor (C,H,W) already in encode_board -> transpose done as in original
-        batch_tensors = []
-        for leaf in leaves_to_eval:
-            encoded_s = ed.encode_board(leaf.game).transpose(2,0,1)
-            batch_tensors.append(encoded_s)
-        batch_np = np.stack(batch_tensors, axis=0).astype(np.float32)  # (B,C,H,W)
-        batch = torch.from_numpy(batch_np).to(device, non_blocking=True)
-        with torch.no_grad():
-            child_priors_batch, value_batch = net(batch)  # assume net handles batched input
-            # child_priors_batch: (B,4672) ; value_batch: (B,1) or (B)
-        child_priors_batch = child_priors_batch.detach().cpu().numpy()
-        value_batch = value_batch.detach().cpu().numpy().reshape(-1)
-
-        # apply outputs to corresponding leaves (in same order)
-        for leaf, priors, val in zip(leaves_to_eval, child_priors_batch, value_batch):
-            # handle terminal: if checkmate then backup without expand (same as original)
-            if leaf.game.check_status() == True and leaf.game.in_check_possible_moves() == []:
-                leaf.backup(float(val))
-            else:
-                # expand: mask only legal moves quickly
-                action_idxs = []
-                for action in leaf.game.actions():
-                    if action != []:
-                        i_pos, f_pos, underprom = action
-                        action_idxs.append(ed.encode_action(leaf.game, i_pos, f_pos, underprom))
-                if action_idxs == []:
-                    leaf.is_expanded = False
-                else:
-                    c_p = np.zeros_like(priors, dtype=np.float32)  # mask others zero
-                    c_p[action_idxs] = priors[action_idxs]
-                    # root noise only for root node (same rule)
-                    if leaf.parent.parent is None:
-                        c_p = leaf.add_dirichlet_noise(action_idxs, c_p)
-                    leaf.expand(c_p)  # sets child_priors inside node
-                    leaf.backup(float(val))
-        # clear lists
-        leaves_to_eval.clear()
-        leaves_idx.clear()
-
     for i in range(num_reads):
         leaf = root.select_leaf()
-        # collect leaf for batched eval
-        leaves_to_eval.append(leaf)
-        leaves_idx.append(i)
-        # flush when batch full
-        if len(leaves_to_eval) >= batch_size:
-            flush_batch()
-
-    # flush leftovers
-    flush_batch()
+        encoded_s = ed.encode_board(leaf.game); encoded_s = encoded_s.transpose(2,0,1)
+        device = next(net.parameters()).device
+        encoded_s = torch.from_numpy(encoded_s).float().to(device)
+        child_priors, value_estimate = net(encoded_s)
+        child_priors = child_priors.detach().cpu().numpy().reshape(-1)
+        value_estimate = value_estimate.item()
+        if leaf.game.check_status() == True and leaf.game.in_check_possible_moves() == []: # if checkmate
+            leaf.backup(value_estimate) 
+            continue
+        leaf.expand(child_priors) # need to make sure valid moves
+        leaf.backup(value_estimate)
     return np.argmax(root.child_number_visits), root
-
 
 def do_decode_n_move_pieces(board,move):
     i_pos, f_pos, prom = ed.decode_action(board,move)
@@ -311,7 +245,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
             # states.append(copy.deepcopy(current_board.current_board))                        
             # энкодим доску
             board_state = copy.deepcopy(ed.encode_board(current_board))                    
-            best_move, root = UCT_search_batched(current_board, simulation_depth, chessnet, simulation_depth, simulation_depth//2) 
+            best_move, root = UCT_search(current_board,simulation_depth,chessnet) 
             # ходим и обновляем состояние доски
             current_board = do_decode_n_move_pieces(current_board,best_move) 
             # получаем вектор распределения вероятностей ходов 
@@ -363,3 +297,29 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
         
 
 
+
+# if __name__=="__main__":
+    
+#     net_to_play="current_net_trained8_iter1.pth.tar"
+#     mp.set_start_method("spawn",force=True)
+#     net = ChessNet()
+#     cuda = torch.cuda.is_available()
+#     if cuda:
+#         net.cuda()
+#     net.share_memory()
+#     net.eval()
+#     print("hi")
+#     #torch.save({'state_dict': net.state_dict()}, os.path.join("./model_data/",\
+#     #                                "current_net.pth.tar"))
+    
+#     current_net_filename = os.path.join("./model_data/",\
+#                                     net_to_play)
+#     checkpoint = torch.load(current_net_filename)
+#     net.load_state_dict(checkpoint['state_dict'])
+#     processes = []
+#     for i in range(5):
+#         p = mp.Process(target=MCTS_self_play,args=(net,50,i))
+#         p.start()
+#         processes.append(p)
+#     for p in processes:
+#         p.join()
