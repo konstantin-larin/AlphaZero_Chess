@@ -311,7 +311,7 @@ def MCTS_self_play(chessnet,num_games, simulation_depth, max_moves, dataset_path
             # states.append(copy.deepcopy(current_board.current_board))                        
             # энкодим доску
             board_state = copy.deepcopy(ed.encode_board(current_board))                    
-            best_move, root = UCT_search_batched(current_board, simulation_depth, chessnet, 32) 
+            best_move, root = UCT_search_batched(current_board, simulation_depth, chessnet, simulation_depth, simulation_depth//2) 
             # ходим и обновляем состояние доски
             current_board = do_decode_n_move_pieces(current_board,best_move) 
             # получаем вектор распределения вероятностей ходов 
