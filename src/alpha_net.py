@@ -84,17 +84,18 @@ class OutBlock(nn.Module):
         self.fc = nn.Linear(BOARD_X*BOARD_Y*policy_hidden_dim, BOARD_X*BOARD_Y*LEGAL_MOVES)
         self.policy_hidden_dim = policy_hidden_dim
     
-    def forward(self,s):
-        v = F.relu(self.bn(self.conv(s))) # value head
-        v = v.view(-1, BOARD_X*BOARD_Y)  # batch_size X channel X height X width
+    def forward(self, s):
+        v = F.relu(self.bn(self.conv(s)))  # value head
+        v = v.view(-1, BOARD_X * BOARD_Y)
         v = F.relu(self.fc1(v))
-        v = F.tanh(self.fc2(v))
-        
-        p = F.relu(self.bn1(self.conv1(s))) # policy head
-        p = p.view(-1, BOARD_X*BOARD_Y*self.policy_hidden_dim)
+        v = torch.tanh(self.fc2(v))
+
+        p = F.relu(self.bn1(self.conv1(s)))  # policy head
+        p = p.reshape(-1, BOARD_X * BOARD_Y * self.policy_hidden_dim)  
         p = self.fc(p)
         p = self.logsoftmax(p).exp()
         return p, v
+
     
 class ChessNet(nn.Module):
     def __init__(self, 
