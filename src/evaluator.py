@@ -75,9 +75,9 @@ class Arena():
             board_state = copy.deepcopy(ed.encode_board(current_board))
             
             if current_board.player == 0:
-                best_move, root = UCT_search_batched(current_board, self.simulation_depth, white, 32)
+                best_move, root = UCT_search_batched(current_board, self.simulation_depth, white, self.simulation_depth // 2)
             elif current_board.player == 1:
-                best_move, root = UCT_search_batched(current_board, self.simulation_depth, black, 32)
+                best_move, root = UCT_search_batched(current_board, self.simulation_depth, black, self.simulation_depth//2)
             
 
             # для просмотра игры в будущем записываем ходы в uci формате            
