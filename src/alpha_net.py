@@ -19,6 +19,9 @@ BOARD_X = 8
 BOARD_Y = 8
 BOARD_CHANNELS = 22
 LEGAL_MOVES = 73
+KERNEL_SIZE = 3
+PADDING = 1
+STRIDE= 1 
 
 
 class board_data(Dataset):
@@ -99,20 +102,14 @@ class OutBlock(nn.Module):
 class ChessNet(nn.Module):
     def __init__(self, 
                  res_blocks_num=19,              
-                 planes=256,    
-                 conv_kernel_size=3,
-                 conv_stride=1,
-                 conv_padding=1,                                  
-                 res_kernel_size=3, 
-                 res_stride=1, 
-                 res_padding=1,
+                 planes=256,                                                                                                                         
                  value_hidden_dim=64,
                  policy_hidden_dim=128,
                  
 
                  name='default_chessnet'):
         super(ChessNet, self).__init__()
-        self.conv = ConvBlock(planes=planes, kernel_size=conv_kernel_size, stride=conv_stride, padding=conv_padding)
+        self.conv = ConvBlock(planes=planes, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING)
         self.name = name
         self.res_blocks_num = res_blocks_num
         for block in range(res_blocks_num):
@@ -120,9 +117,9 @@ class ChessNet(nn.Module):
                     ResBlock(
                         inplanes=planes,
                         planes=planes,
-                        kernel_size=res_kernel_size,
-                        stride=res_stride,
-                        padding=res_padding,                        
+                        kernel_size=KERNEL_SIZE,
+                        stride=STRIDE,
+                        padding=PADDING,                        
                     ))
         self.outblock = OutBlock(
             inplanes=planes,
@@ -142,8 +139,8 @@ class AlphaLoss(torch.nn.Module):
     def __init__(self):
         super(AlphaLoss, self).__init__()
 
-    def forward(self, y_value, value, y_policy, policy):
-        value_error = (value - y_value) ** 2
+    def forward(self, y_value, value, y_policy, policy):        
+        value_error = (value - y_value) ** 2        
         policy_error = torch.sum((-policy* 
                                 (1e-6 + y_policy.float()).float().log()), 1)
         total_error = (value_error.view(-1).float() + policy_error).mean()

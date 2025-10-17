@@ -48,16 +48,10 @@ def run_pipeline(
             'run_name': "sl + rl",            
         },
         model_params = {
-            "res_blocks_num": 19,
-            "planes": 256, 
-            "conv_kernel_size": 3,
-            "conv_stride": 1,
-            "conv_padding": 1,                        
-            "res_kernel_size": 3, 
-            "res_stride": 1, 
-            "res_padding": 1,
-            "value_hidden_dim": 64,
-            "policy_hidden_dim": 128,
+            "res_blocks_num": 32,
+            "planes": 512,                                                           
+            "value_hidden_dim": 128,
+            "policy_hidden_dim": 256,
         },
 
         sl_params = {                        
@@ -78,7 +72,7 @@ def run_pipeline(
         },
 
         sl=True,
-        rl=True,
+        rl=False,
         is_debug=True,               
         batch_size=64,  
         num_heads=5,
@@ -167,7 +161,8 @@ def run_pipeline(
 
 
         
-        # reinforce learning
+        checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
+        # reinforce learning        
         if rl:       
             if use_mlflow:
                 mlflow.start_run(run_name='Reinforcement Learning', nested=True) 
@@ -185,8 +180,7 @@ def run_pipeline(
                 #ставим на cuda            
                 if cuda:
                     net.cuda()
-        
-                checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
+                        
                 net.load_state_dict(checkpoint['state_dict'])
                         
                 net.share_memory()
@@ -265,6 +259,12 @@ def run_pipeline(
                     mlflow.end_run()        
             if use_mlflow:
                 mlflow.end_run()
+        else:
+            best_net = ChessNet(**model_params) 
+            best_net.load_state_dict(checkpoint['state_dict'])
+            if cuda:
+                best_net.cuda()
+            best_net.eval()
 
                 
         # test best_net      
