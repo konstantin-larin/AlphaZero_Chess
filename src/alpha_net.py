@@ -98,13 +98,11 @@ class OutBlock(nn.Module):
     
 class ChessNet(nn.Module):
     def __init__(self, 
-                 res_blocks_num=19,
-                 conv_planes=256, 
+                 res_blocks_num=19,              
+                 planes=256,    
                  conv_kernel_size=3,
                  conv_stride=1,
-                 conv_padding=1,
-                 res_inplanes=256, 
-                 res_planes=256, 
+                 conv_padding=1,                                  
                  res_kernel_size=3, 
                  res_stride=1, 
                  res_padding=1,
@@ -114,20 +112,20 @@ class ChessNet(nn.Module):
 
                  name='default_chessnet'):
         super(ChessNet, self).__init__()
-        self.conv = ConvBlock(planes=conv_planes, kernel_size=conv_kernel_size, stride=conv_stride, padding=conv_padding)
+        self.conv = ConvBlock(planes=planes, kernel_size=conv_kernel_size, stride=conv_stride, padding=conv_padding)
         self.name = name
         self.res_blocks_num = res_blocks_num
         for block in range(res_blocks_num):
             setattr(self, "res_%i" % block,
                     ResBlock(
-                        inplanes=res_inplanes,
-                        planes=res_planes,
+                        inplanes=planes,
+                        planes=planes,
                         kernel_size=res_kernel_size,
                         stride=res_stride,
                         padding=res_padding,                        
                     ))
         self.outblock = OutBlock(
-            inplanes=res_planes,
+            inplanes=planes,
             value_hidden_dim=value_hidden_dim,            
             policy_hidden_dim=policy_hidden_dim
         )
