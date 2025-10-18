@@ -126,13 +126,14 @@ def run_pipeline(
 
 
         if os.path.exists(best_net_filename):
-            checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
+            checkpoint = torch.load(best_net_filename) 
             net = ChessNet(**model_params)            
             net.load_state_dict(checkpoint['state_dict'])
+            print('существующая модель загружена')
         else:
             net = ChessNet(**model_params)
 
-            
+
         if cuda: 
                 net.cuda()
                         
