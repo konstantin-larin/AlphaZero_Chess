@@ -108,8 +108,8 @@ def create_game_states(data, full_path):
                     action_idxs.append(ed.encode_action(board,initial_pos,final_pos,underpromote))            
                 
             if len(action_idxs) > 1:
-                p[action_idxs] = (1 - 0.8) / (len(action_idxs) - 1)
-                p[action_index] = 0.8                                                            
+                p[action_idxs] = (1 - 0.5) / (len(action_idxs) - 1)
+                p[action_index] = 0.5                                                        
             else:
                 p[action_index] = 1.0
             
