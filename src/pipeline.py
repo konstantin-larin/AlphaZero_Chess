@@ -83,7 +83,9 @@ def run_pipeline(
         selfplay_data_path=os.path.join(absoute_path, 'selfplay_data.h5'),
         eval_path=os.path.join(absoute_path, 'evaluation_data'),
         supervised_source_path=os.path.join(absoute_path, 'pretrain.csv'),
-        supervised_dest_path=os.path.join(absoute_path, 'supervised_data'),                         
+        supervised_dest_path=os.path.join(absoute_path, 'supervised_data'),
+
+        proba_of_right_move=0.5
         ):
     
     
@@ -120,16 +122,22 @@ def run_pipeline(
 
         best_net_filename = os.path.join(save_path,\
                                                 f"best_net_trained8.pth.tar")           
-        train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed)    
+        train_path, val_path, test_path = preprocess_data(supervised_source_path, supervised_dest_path, seed, proba_of_right_move=proba_of_right_move)    
 
 
-        # supervised pretraining - делаем best_net изначальную 
-        if sl:                    
-            net = ChessNet(name='base_supervised', **model_params) # инициализируем сетку
+        if os.path.exists(best_net_filename):
+            checkpoint = torch.load(best_net_filename) # для нулевой итерации здесь просто будет supervised модель
+            net = ChessNet(**model_params)            
+            net.load_state_dict(checkpoint['state_dict'])
+        else:
+            net = ChessNet(**model_params)
+
             
-            print('supervised learning')
-            if cuda:
+        if cuda: 
                 net.cuda()
+                        
+        if sl:                                        
+            print('supervised learning')            
             net.train() 
             if use_mlflow:
                 mlflow.start_run(run_name=f"Supervised_Learning", nested=True)     
@@ -151,8 +159,7 @@ def run_pipeline(
                 mlflow.pytorch.log_model(net, name='model')
                 mlflow.end_run()                
 
-        else:
-            net = ChessNet(**model_params) # если supervised learning отключено, то просто чтоб не сломалось заливаем веса рандомной сети
+        else:            
             torch.save({'state_dict': net.state_dict()}, best_net_filename)
         
         

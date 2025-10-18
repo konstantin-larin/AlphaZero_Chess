@@ -75,7 +75,7 @@ def uci_to_indices(move):
 
 
 
-def create_game_states(data, full_path):
+def create_game_states(data, full_path, proba_of_right_move=0.5):
     # если уже есть — просто загружаем
     if os.path.exists(full_path):    
         print(f"[INFO] Loading existing file: {full_path}")
@@ -108,8 +108,8 @@ def create_game_states(data, full_path):
                     action_idxs.append(ed.encode_action(board,initial_pos,final_pos,underpromote))            
                 
             if len(action_idxs) > 1:
-                p[action_idxs] = (1 - 0.5) / (len(action_idxs) - 1)
-                p[action_index] = 0.5                                                        
+                p[action_idxs] = (1 - proba_of_right_move) / (len(action_idxs) - 1)
+                p[action_index] = proba_of_right_move                                                        
             else:
                 p[action_index] = 1.0
             
@@ -131,25 +131,27 @@ def create_game_states(data, full_path):
     return full_path
 
 
-def preprocess_data(source_path, dest_path, seed):
+def preprocess_data(source_path, dest_path, seed, proba_of_right_move=0.5):
     data = pd.read_csv(source_path)
     train, test = train_test_split(data, test_size=0.2, random_state=seed, shuffle=True)
     test, val = train_test_split(test, test_size=0.5, random_state=seed, shuffle=True)
 
     train_path = os.path.join(dest_path, 'train.h5')
-    create_game_states(train, train_path)
+    create_game_states(train, train_path, proba_of_right_move)
     del train
 
     val_path = os.path.join(dest_path, 'val.h5')
-    create_game_states(val, val_path)
+    create_game_states(val, val_path, proba_of_right_move)
     del val
 
     test_path = os.path.join(dest_path, 'test.h5')
-    create_game_states(test, test_path)
+    create_game_states(test, test_path, proba_of_right_move)
     del test
 
     return train_path, val_path, test_path
 
 
-if __name__ == "__main__":    
-    preprocess_data()    
+# def supervised_learning(train_path, val_path, test_path):
+
+# if __name__ == "__main__":    
+      
