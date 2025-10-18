@@ -154,6 +154,7 @@ def run_pipeline(
                 seed=seed,
                 save_path=save_path,
                 is_debug=is_debug,            
+                save_func=lambda net: torch.save({'state_dict': net.state_dict()}, best_net_filename)
             )        
             torch.save({'state_dict': net.state_dict()}, best_net_filename)
             if use_mlflow:

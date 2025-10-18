@@ -156,7 +156,8 @@ def train(net,
           is_debug=False,
           adam_lr=3e-3,
           scheduler_gamma=0.2,
-          batch_size=64,          
+          batch_size=64,  
+          save_func=None        
           ):
     print("Starting Training")
     torch.manual_seed(seed)
@@ -285,6 +286,8 @@ def train(net,
     else:
         plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
     print("Finished Training")
+    if save_func:
+        save_func(net)
 
 
 
