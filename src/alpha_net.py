@@ -287,6 +287,7 @@ def train(net,
         plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
     print("Finished Training")
     if save_func:
+        print('save')
         save_func(net)
 
 
