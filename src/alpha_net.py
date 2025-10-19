@@ -74,7 +74,7 @@ class ResBlock(nn.Module):
         return out
     
 class OutBlock(nn.Module):
-    def __init__(self, inplanes, value_hidden_dim, policy_hidden_dim):
+    def __init__(self, inplanes, value_hidden_dim, policy_hidden_dim, dropout=0.3):
         super(OutBlock, self).__init__()
         self.conv = nn.Conv2d(inplanes, 1, kernel_size=1) # value head
         self.bn = nn.BatchNorm2d(1)
@@ -86,14 +86,16 @@ class OutBlock(nn.Module):
         self.logsoftmax = nn.LogSoftmax(dim=1)
         self.fc = nn.Linear(BOARD_X*BOARD_Y*policy_hidden_dim, BOARD_X*BOARD_Y*LEGAL_MOVES)
         self.policy_hidden_dim = policy_hidden_dim
+
+        self.dropout= nn.Dropout(p=dropout)
     
     def forward(self,s):
-        v = F.relu(self.bn(self.conv(s))) # value head
+        v = self.dropout(F.relu(self.bn(self.conv(s)))) # value head
         v = v.view(-1, BOARD_X*BOARD_Y)  # batch_size X channel X height X width
         v = F.relu(self.fc1(v))
         v = F.tanh(self.fc2(v))
         
-        p = F.relu(self.bn1(self.conv1(s))) # policy head
+        p = self.dropout(F.relu(self.bn1(self.conv1(s)))) # policy head
         p = p.view(-1, BOARD_X*BOARD_Y*self.policy_hidden_dim)
         p = self.fc(p)
         p = self.logsoftmax(p).exp()
@@ -105,6 +107,7 @@ class ChessNet(nn.Module):
                  planes=256,                                                                                                                         
                  value_hidden_dim=64,
                  policy_hidden_dim=128,
+                 dropout=0.3,
                  
 
                  name='default_chessnet'):
@@ -124,7 +127,8 @@ class ChessNet(nn.Module):
         self.outblock = OutBlock(
             inplanes=planes,
             value_hidden_dim=value_hidden_dim,            
-            policy_hidden_dim=policy_hidden_dim
+            policy_hidden_dim=policy_hidden_dim,
+            dropout=dropout            
         )
     
     def forward(self,s):

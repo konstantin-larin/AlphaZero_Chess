@@ -52,6 +52,7 @@ def run_pipeline(
             "planes": 512,                                                           
             "value_hidden_dim": 128,
             "policy_hidden_dim": 256,
+            'dropout': 0.3
         },
 
         sl_params = {                        
