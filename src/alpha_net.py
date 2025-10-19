@@ -274,6 +274,9 @@ def train(net,
         if len(losses_per_epoch) > 5 and abs(losses_per_epoch[-1] - losses_per_epoch[-5]) < 1e-3:
             tqdm.write("Early stopping: loss plateau.")
             break
+        if save_func:
+            print('save')
+            save_func(net)
 
     # Plot losses
     plt.figure()
@@ -285,10 +288,7 @@ def train(net,
         mlflow.log_figure(plt.gcf(), f"Loss_vs_Epoch.png")        
     else:
         plt.savefig(os.path.join(save_path, "Loss_vs_Epoch.png"))
-    print("Finished Training")
-    if save_func:
-        print('save')
-        save_func(net)
+    print("Finished Training")    
 
 
 

@@ -135,7 +135,7 @@ def run_pipeline(
 
 
         if cuda: 
-                net.cuda()
+            net.cuda()
                         
         if sl:                                        
             print('supervised learning')            
